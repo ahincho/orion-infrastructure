@@ -44,20 +44,32 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Run gitleaks (working tree only)
-        # Pinned to v2 (NOT v3) because v3 dropped the `args` input — v3
-        # ignores our `--no-git` flag and forces a `git log -p` history scan
-        # that breaks on the 1-commit branches produced by dependabot.
-        # v2 still supports `args:` + `--no-git --redact` and is a drop-in.
-        # TODO(migration): GitHub Actions removes Node 20 runtime on
-        # 2026-09-16. Plan a v3 migration: use a manual `gitleaks detect`
-        # bash step (no third-party action), or write FINGERPRINT-format
-        # entries in `.gitleaksignore` to silence historical findings.
-        uses: gitleaks/gitleaks-action@v2
-        with:
-          args: --no-git --redact
+      # We run gitleaks directly instead of using the `gitleaks/gitleaks-action`
+      # third-party action. Rationale: every release of that action
+      # (v1, v2, v3) hardcodes `git log -p <sha>^..<sha>` and silently
+      # ignores the `args:` input that would let us pass `--no-git`.
+      # That history scan breaks on the 1-commit branches produced by
+      # dependabot (parent commit `<sha>^` does not exist in a shallow
+      # checkout). Running gitleaks ourselves means:
+      #   - we always scan only the working tree (`--no-git`)
+      #   - no action-version dependency, no Node 20 EOL risk
+      #   - secrets in output are redacted (`--redact`)
+      # Binary version is pinned to a tag; bump via Dependabot (regular
+      # `github-actions` ecosystem would not detect this — we leave it
+      # to manual review since gitleaks is a security tool).
+      - name: Run gitleaks (working tree only, pinned binary)
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: "8.24.3"
+        run: |
+          set -euo pipefail
+          ARCH="linux_x64"
+          URL="https://github.com/zricethezav/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_${ARCH}.tar.gz"
+          echo "Downloading gitleaks v${GITLEAKS_VERSION} from ${URL}"
+          curl -sSfL --retry 3 -o /tmp/gitleaks.tar.gz "${URL}"
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          /tmp/gitleaks version
+          echo "Scanning working tree ..."
+          /tmp/gitleaks detect --no-git --redact --exit-code=2 --source .
 
   yamllint:
     name: yamllint
