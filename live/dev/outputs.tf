@@ -17,3 +17,12 @@ output "terraform_apply_role_arn" {
   description = "ARN del role IAM para terraform apply. Wire a GitHub Secret AWS_APPLY_ROLE_ARN."
   value       = module.oidc_github.terraform_apply_role_arn
 }
+
+output "smoke_test" {
+  description = "Smoke test para validar que el apply CD corrió efectivamente contra AWS. Expone la identidad del role asumido."
+  value = {
+    account_id = data.aws_caller_identity.current.account_id
+    arn        = data.aws_caller_identity.current.arn
+    user_id    = data.aws_caller_identity.current.user_id
+  }
+}
