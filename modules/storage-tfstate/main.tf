@@ -37,6 +37,10 @@ locals {
 resource "aws_s3_bucket" "tfstate" {
   bucket = local.bucket_name
 
+  # checkov:skip=CKV_AWS_18:dev-only state bucket; access logging not required for dev environment
+  # checkov:skip=CKV_AWS_144:single-region dev environment; cross-region replication not applicable
+  # checkov:skip=CKV_AWS_145:SSE-S3 AES256 is sufficient for tfstate dev; KMS adds complexity without benefit at this stage
+  # checkov:skip=CKV2_AWS_62:tfstate bucket has no event consumer (Lambda/SQS/SNS); event notifications not applicable
   tags = merge(local.common_tags, {
     Name = local.bucket_name
   })
@@ -85,24 +89,29 @@ resource "aws_s3_bucket_public_access_block" "tfstate" {
 }
 
 ###############################################################################
-# Lifecycle policy (opcional, configurable via variables)
+# Lifecycle policy
 ###############################################################################
-# Usar transition_to_ia_days para reducir costo de objetos antiguos.
-# NO recomendado para el state file activo (siempre se necesita acceso rapido).
-# Solo util si se hace backup historico o si el bucket se usa para otros
-# archivos de Terraform (no nuestro caso).
+# Siempre presente (count=1) para:
+#   - abort_incomplete_multipart_upload_days: aborta uploads multipart
+#     abandonados (CKV_AWS_300). Los uploads de tfstate via S3 client
+#     pueden quedar hueros si el proceso muere; limpieza automatica.
+#   - transitions dinamicos a IA/Glacier (opcionales via variables,
+#     default 0 = sin transition). NO recomendado para el state file
+#     activo (siempre se necesita acceso rapido).
 ###############################################################################
 
 resource "aws_s3_bucket_lifecycle_configuration" "tfstate" {
-  count = (var.lifecycle_transition_to_ia_days > 0 || var.lifecycle_transition_to_glacier_days > 0) ? 1 : 0
-
   bucket = aws_s3_bucket.tfstate.id
 
   rule {
-    id     = "transition-old-versions"
+    id     = "abort-multipart-and-optional-transitions"
     status = "Enabled"
 
     filter {}
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
 
     dynamic "noncurrent_version_transition" {
       for_each = var.lifecycle_transition_to_ia_days > 0 ? [1] : []

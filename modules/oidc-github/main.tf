@@ -105,6 +105,8 @@ resource "aws_iam_role_policy" "plan" {
   name = "${var.project_name}-terraform-plan-policy"
   role = aws_iam_role.plan.id
 
+  # checkov:skip=CKV_AWS_288:plan role is read-only (Describe/Get/List); data exfil risk is acceptable for plan phase
+  # checkov:skip=CKV_AWS_355:plan role needs wildcard resource for read-only AWS API calls across all resources
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -162,6 +164,10 @@ resource "aws_iam_role_policy" "apply" {
   name = "${var.project_name}-terraform-apply-policy"
   role = aws_iam_role.apply.id
 
+  # checkov:skip=CKV_AWS_63:apply role is intentionally broad (Action=*) to manage all AWS resources
+  # checkov:skip=CKV_AWS_62:same as CKV_AWS_63; apply role is admin-equivalent but region-locked by aws:RequestedRegion
+  # checkov:skip=CKV_AWS_288:apply role can read data (needed for terraform apply); region-locked condition mitigates exfil risk
+  # checkov:skip=CKV2_AWS_40:apply role has Action=* which includes IAM; region-locked by aws:RequestedRegion condition
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
