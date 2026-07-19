@@ -1,7 +1,7 @@
 # =============================================================================
 # CD - Terraform Apply
 # =============================================================================
-# Caller del reusable en spark-match/spark-match-01-devops@dev.
+# Caller del reusable en ahincho/spark-match-01-devops@dev.
 # Trigger: push a main (auto-deploy a dev env).
 #
 # Los inputs viven hardcoded aqui a proposito (ver AGENTS.md "Convenciones
