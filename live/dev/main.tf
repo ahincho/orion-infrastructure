@@ -38,3 +38,10 @@ module "oidc_github" {
   project_name      = var.project_name
   github_repository = var.github_repository
 }
+
+###############################################################################
+# Smoke test: data source para validar que Apply CD corre contra AWS.
+# No crea recursos; solo consulta sts:GetCallerIdentity en cada plan/apply.
+# El output smoke_test expone la cuenta/arn del role asumido por el workflow.
+###############################################################################
+data "aws_caller_identity" "current" {}
