@@ -1,0 +1,51 @@
+version: 2
+
+updates:
+  # GitHub Actions: escanea workflows locales (los reusables no se escanean
+  # porque viven en spark-match-01-devops).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+    commit-message:
+      prefix: "ci(deps)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "ci"
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    open-pull-requests-limit: 5
+
+  # Terraform providers: escanea .terraform.lock.hcl en cada root/module.
+  - package-ecosystem: "terraform"
+    directories:
+      - "/live/dev"
+      - "/live/prod"
+      - "/modules/storage-tfstate"
+      - "/modules/oidc-github"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+    commit-message:
+      prefix: "ci(deps)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "terraform"
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    open-pull-requests-limit: 3

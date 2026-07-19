@@ -1,0 +1,52 @@
+# Terraform local cache and state
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+crash.log
+crash.*.log
+
+# Lock file: SI se commitea (reproducibilidad de providers).
+!*.terraform.lock.hcl
+
+# Plan files (locales)
+tfplan
+tfplan.json
+
+# Tfvars locales con secretos (NO se commitea)
+*.tfvars
+!*.tfvars.example
+!terraform.tfvars
+
+# Plugin cache
+.terraform.d/
+plugin-cache/
+
+# Pre-commit cache
+.cache/
+
+# GitHub Actions local
+.act/
+
+# actionlint cache
+.actionlint.cache
+.actionlint.json.local
+
+# Shell scripts
+.shellcheckrc.local
+*.shellcheck
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Secrets locales (por si se filtran)
+secrets/
+*.env
+.env.local
