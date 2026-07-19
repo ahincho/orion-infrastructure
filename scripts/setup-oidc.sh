@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================================
 # setup-oidc.sh
-# Crea el IAM OIDC provider de GitHub Actions + 4 IAM roles.
+# Crea el IAM OIDC provider de GitHub Actions + 2 IAM roles (plan + apply).
 #
 # USO:
 #   - SOLO si NO usas Terraform para crear el OIDC (recomendamos Terraform).
@@ -15,14 +15,12 @@
 #   - Tener un bucket S3 para state (corre bootstrap-backend.sh antes).
 #
 # Outputs (pegar en docs/SETUP.md):
-#   - orion-terraform-plan-dev-arn
-#   - orion-terraform-apply-dev-arn
-#   - orion-terraform-plan-prod-arn
-#   - orion-terraform-apply-prod-arn
+#   - orion-terraform-plan-arn
+#   - orion-terraform-apply-arn
 # ============================================================================
 set -euo pipefail
 
-GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-ahincho/orion-infrastructure-devops}"
+GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-ahincho/orion-infrastructure}"
 OIDC_THUMBPRINT="${OIDC_THUMBPRINT:-6938fd4d98bab03faadb97b34396831e3780aea1}"
 
 echo "=========================================="
@@ -58,7 +56,6 @@ fi
 ###############################################################################
 # Helper: create or update IAM role with OIDC trust
 ###############################################################################
-
 create_role() {
   local role_name="$1"
   local sub_pattern_json="$2"
@@ -88,10 +85,9 @@ attach_policy() {
 }
 
 ###############################################################################
-# 2. Roles plan (read-only)
+# 2. Roles plan (read-only) + apply (write)
 ###############################################################################
-
-PLAN_TRUST=$(cat <<EOF
+COMMON_TRUST=$(cat <<EOF
 {
   "Version": "2012-10-17",
   "Statement": [{
@@ -129,17 +125,35 @@ PLAN_POLICY=$(cat <<'EOF'
 EOF
 )
 
-# plan-dev
-DEV_PATTERNS='["repo:'"${GITHUB_REPOSITORY}"':ref:refs/heads/dev","repo:'"${GITHUB_REPOSITORY}"':pull_request","repo:'"${GITHUB_REPOSITORY}"':environment:dev"]'
-TRUST_DEV=$(echo "${PLAN_TRUST}" | jq --argjson subs "${DEV_PATTERNS}" '.Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] = $subs | tostring? // .')
-create_role "orion-terraform-plan-dev" "$(echo "${PLAN_TRUST}" | jq --argjson subs "${DEV_PATTERNS}" '.Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] = $subs')"
-attach_policy "orion-terraform-plan-dev" "plan-policy" "${PLAN_POLICY}"
+APPLY_POLICY=$(cat <<'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": "*",
+    "Resource": "*",
+    "Condition": {
+      "StringEquals": {"aws:RequestedRegion": "us-east-1"}
+    }
+  }]
+}
+EOF
+)
+
+# sub patterns: cualquier push/PR contra main + jobs con environment:dev
+SUB_PATTERNS='["repo:'"${GITHUB_REPOSITORY}"':ref:refs/heads/main","repo:'"${GITHUB_REPOSITORY}"':pull_request","repo:'"${GITHUB_REPOSITORY}"':environment:dev"]'
+
+PLAN_TRUST=$(echo "${COMMON_TRUST}" | sed "s/\"PLACEHOLDER\"/$(printf '%s' "${SUB_PATTERNS}" | sed 's/"/\\"/g')/")
+
+create_role "orion-terraform-plan" "${PLAN_TRUST}"
+attach_policy "orion-terraform-plan" "plan-policy" "${PLAN_POLICY}"
+
+create_role "orion-terraform-apply" "${PLAN_TRUST}"
+attach_policy "orion-terraform-apply" "apply-policy" "${APPLY_POLICY}"
 
 echo ""
 echo "[SUCCESS] Roles created. ARNs:"
-echo "  plan-dev:   arn:aws:iam::${ACCOUNT_ID}:role/orion-terraform-plan-dev"
-echo "  apply-dev:  arn:aws:iam::${ACCOUNT_ID}:role/orion-terraform-apply-dev"
-echo "  plan-prod:  arn:aws:iam::${ACCOUNT_ID}:role/orion-terraform-plan-prod"
-echo "  apply-prod: arn:aws:iam::${ACCOUNT_ID}:role/orion-terraform-apply-prod"
+echo "  plan:  arn:aws:iam::${ACCOUNT_ID}:role/orion-terraform-plan"
+echo "  apply: arn:aws:iam::${ACCOUNT_ID}:role/orion-terraform-apply"
 echo ""
 echo "Siguiente paso: docs/SETUP.md (crear GitHub Secrets con estos ARNs)."

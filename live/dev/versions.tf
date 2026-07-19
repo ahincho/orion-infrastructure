@@ -9,8 +9,8 @@ terraform {
   }
 
   backend "s3" {
-    # Los valores reales se pasan via backend-config al hacer init.
-    # Ver terraform.tfvars.example y scripts/bootstrap-backend.sh.
+    # Valores reales via backend-config al hacer init.
+    # Ver scripts/bootstrap-backend.sh.
     # bucket       = "orion-tfstate-dev"
     # key          = "dev/terraform.tfstate"
     # region       = "us-east-1"

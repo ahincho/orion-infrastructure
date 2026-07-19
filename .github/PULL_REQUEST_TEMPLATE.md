@@ -16,7 +16,7 @@
 
 <!-- Lista de cambios principales (un bullet por modulo/archivo). -->
 
--
+- 
 
 ## Validacion local
 
@@ -25,23 +25,14 @@
 - [ ] `pre-commit run --all-files` paso
 - [ ] `terraform fmt -recursive -diff` paso
 - [ ] `terraform validate` paso en live/dev
-- [ ] `terraform validate` paso en live/prod
 
-## Plan / Apply esperado
+## terraform plan esperado
 
 <!-- Pegar output resumido de terraform plan para que el reviewer vea que
      cambios producira. Si no se ha corrido, dejarlo en blanco. -->
 
 <details>
 <summary>terraform plan (live/dev)</summary>
-
-```
-```
-
-</details>
-
-<details>
-<summary>terraform plan (live/prod)</summary>
 
 ```
 ```

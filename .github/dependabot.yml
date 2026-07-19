@@ -28,7 +28,6 @@ updates:
   - package-ecosystem: "terraform"
     directories:
       - "/live/dev"
-      - "/live/prod"
       - "/modules/storage-tfstate"
       - "/modules/oidc-github"
     schedule:

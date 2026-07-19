@@ -1,6 +1,36 @@
 # Module: oidc-github
 
-Crea el IAM Identity Provider de GitHub Actions + 4 IAM roles OIDC (plan/apply × dev/prod).
+Crea el IAM OIDC provider para GitHub Actions + 2 IAM roles para Terraform
+sobre el ambiente dev.
+
+## Recursos
+
+| Recurso | Nombre | Permisos |
+|---|---|---|
+| `aws_iam_openid_connect_provider.github` | (sin nombre) | OIDC issuer `token.actions.githubusercontent.com` |
+| `aws_iam_role.plan` | `orion-terraform-plan` | read-only (`ec2:Describe*`, `iam:Get*`, `iam:List*`, `kms:Describe*`, `s3:Get*`, `s3:List*`, `sts:GetCallerIdentity`) |
+| `aws_iam_role.apply` | `orion-terraform-apply` | `Action: "*"` restringido a `aws:RequestedRegion` |
+
+## Trust policy (ambos roles)
+
+Los roles SOLO pueden ser asumidos cuando el OIDC token cumple:
+
+- `aud = sts.amazonaws.com`
+- `sub` matches:
+  - `repo:<github_repository>:ref:refs/heads/main`
+  - `repo:<github_repository>:pull_request`
+  - `repo:<github_repository>:environment:dev`
+
+Es decir: cualquier push o PR contra `main` del repo del caller, o cualquier
+job con `environment:dev`, puede asumir los roles. Si en el futuro se
+quiere producir a otro AWS environment, generar otro modulo o parametrizar.
+
+## Outputs
+
+- `oidc_provider_arn` â€” ARN del OIDC provider.
+- `oidc_provider_url` â€” URL del issuer.
+- `terraform_plan_role_arn` â€” ARN del role plan (para GitHub Secret `AWS_PLAN_ROLE_ARN`).
+- `terraform_apply_role_arn` â€” ARN del role apply (para GitHub Secret `AWS_APPLY_ROLE_ARN`).
 
 ## Uso
 
@@ -10,25 +40,9 @@ module "oidc_github" {
 
   project_name      = "orion"
   aws_region        = "us-east-1"
-  github_repository = "ahincho/orion-infrastructure-devops"
+  github_repository = "ahincho/orion-infrastructure"
 }
+
+output "plan_arn"  { value = module.oidc_github.terraform_plan_role_arn }
+output "apply_arn" { value = module.oidc_github.terraform_apply_role_arn }
 ```
-
-## Outputs
-
-| Output | Descripcion |
-|---|---|
-| `oidc_provider_arn` | ARN del IAM OIDC provider. |
-| `oidc_provider_url` | URL del OIDC provider. |
-| `terraform_plan_role_arn_dev` | ARN del role plan-dev. Wire a `AWS_PLAN_ROLE_ARN_DEV`. |
-| `terraform_apply_role_arn_dev` | ARN del role apply-dev. Wire a `AWS_APPLY_ROLE_ARN_DEV`. |
-| `terraform_plan_role_arn_prod` | ARN del role plan-prod. Wire a `AWS_PLAN_ROLE_ARN_PROD`. |
-| `terraform_apply_role_arn_prod` | ARN del role apply-prod. Wire a `AWS_APPLY_ROLE_ARN_PROD`. |
-
-## Decisiones
-
-- **Trust policy por env (estricto)**: cada role SOLO acepta el `sub` claim de su env. Un token para `environment:dev` no puede asumir `*-prod`.
-- **Plan roles**: read-only sobre AWS (EC2 describe, IAM get/list, KMS describe, S3 read). Defiende contra codigo malicioso en un PR que pueda exfiltrar el state pero no pueda crear/modificar recursos.
-- **Apply roles**: full access scoped a la region (region lock via `aws:RequestedRegion`).
-- **Lock de region**: previene que un role de dev aplique a una region inesperada.
-- **Thumbprint**: 6938fd4d98bab03faadb97b34396831e3780aea1 (estable desde 2023). Si GitHub rota el cert raiz, actualizar `oidc_provider_thumbprint` via variable.

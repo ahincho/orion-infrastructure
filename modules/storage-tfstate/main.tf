@@ -25,7 +25,7 @@ locals {
       Project     = var.project_name
       Environment = var.environment
       ManagedBy   = "terraform"
-      Repository  = "ahincho/orion-infrastructure-devops"
+      Repository  = "ahincho/orion-infrastructure"
     }
   )
 }

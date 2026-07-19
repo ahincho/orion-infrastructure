@@ -2,18 +2,16 @@
 # CI - Terraform Plan
 # =============================================================================
 # Caller del reusable en spark-match/spark-match-01-devops@dev.
-# En PR contra dev: solo Plan (dev).
-# En dispatch: Plan (dev) y Plan (prod) para validar antes de promover.
+# Unico env (dev). Trigger: pull_request contra main + workflow_dispatch.
 #
-# Pin @dev sigue la convencion VERSIONING.md de spark-match-01-devops
-# (reusables se prueban en dev antes de promover a main).
+# Pin @dev: reusables se prueban en dev antes de promover a main.
 # =============================================================================
 
 name: CI - Terraform Plan
 
 on:
   pull_request:
-    branches: [main, dev]
+    branches: [main]
     types: [opened, synchronize, reopened]
     paths:
       - "**.tf"
@@ -29,57 +27,16 @@ permissions:
   id-token: write
 
 jobs:
-  plan-pr:
-    name: Plan (${{ matrix.environment }})
-    if: github.event_name == 'pull_request'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - environment: dev
-            working-directory: live/dev
-            backend-bucket: orion-tfstate-dev
-            backend-key: dev/terraform.tfstate
-            plan-role-arn-secret: AWS_PLAN_ROLE_ARN_DEV
-
+  plan:
+    name: Plan (dev)
     uses: spark-match/spark-match-01-devops/.github/workflows/terraform-plan.yml@dev
     secrets: inherit
     with:
-      environment: ${{ matrix.environment }}
-      working-directory: ${{ matrix.working-directory }}
+      environment: dev
+      working-directory: live/dev
       aws-region: us-east-1
-      plan-role-arn-secret: ${{ matrix.plan-role-arn-secret }}
-      terraform-version: '1.10.0'
-      backend-bucket: ${{ matrix.backend-bucket }}
-      backend-key: ${{ matrix.backend-key }}
+      plan-role-arn-secret: AWS_PLAN_ROLE_ARN
+      terraform-version: "1.10.0"
+      backend-bucket: orion-tfstate-dev
+      backend-key: dev/terraform.tfstate
       comment-on-pr: true
-
-  plan-dispatch:
-    name: Plan (${{ matrix.environment }})
-    if: github.event_name == 'workflow_dispatch'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - environment: dev
-            working-directory: live/dev
-            backend-bucket: orion-tfstate-dev
-            backend-key: dev/terraform.tfstate
-            plan-role-arn-secret: AWS_PLAN_ROLE_ARN_DEV
-          - environment: prod
-            working-directory: live/prod
-            backend-bucket: orion-tfstate-prod
-            backend-key: prod/terraform.tfstate
-            plan-role-arn-secret: AWS_PLAN_ROLE_ARN_PROD
-
-    uses: spark-match/spark-match-01-devops/.github/workflows/terraform-plan.yml@main
-    secrets: inherit
-    with:
-      environment: ${{ matrix.environment }}
-      working-directory: ${{ matrix.working-directory }}
-      aws-region: us-east-1
-      plan-role-arn-secret: ${{ matrix.plan-role-arn-secret }}
-      terraform-version: '1.10.0'
-      backend-bucket: ${{ matrix.backend-bucket }}
-      backend-key: ${{ matrix.backend-key }}
-      comment-on-pr: false

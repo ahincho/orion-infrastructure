@@ -1,11 +1,11 @@
-﻿# ORION — Infraestructura como Código
+# ORION - Infraestructura como Codigo
 
-Infraestructura AWS del proyecto **ORION** (Pequeño Sistema Cognitivo),
-gestionada con **Terraform puro** y pipelines reutilizables desde
+Infraestructura AWS del proyecto **ORION** (Sistema Cognitivo), gestionada con
+**Terraform puro** y pipelines reutilizables desde
 `spark-match/spark-match-01-devops`.
 
-> **Owner:** `@ahincho` (solo)
-> **Repo:** [ahincho/orion-infrastructure-devops](https://github.com/ahincho/orion-infrastructure-devops)
+> **Owner:** `@ahincho` (solo, proyecto rapido)
+> **Repo:** [ahincho/orion-infrastructure](https://github.com/ahincho/orion-infrastructure)
 
 ---
 
@@ -15,62 +15,52 @@ gestionada con **Terraform puro** y pipelines reutilizables desde
 - **IaC:** Terraform `>= 1.6.0`, provider `hashicorp/aws ~> 5.40`
 - **Backend:** S3 + native lockfile (`use_lockfile = true`)
 - **Pipelines:** [Reusable workflows](https://github.com/spark-match/spark-match-01-devops/tree/main/.github/workflows)
-  desde `spark-match/spark-match-01-devops` (pin `@dev` para dev, `@main` para prod)
+  desde `spark-match/spark-match-01-devops` pinneados `@dev`.
 - **Linting:** tflint, terraform fmt, pre-commit-terraform, yamllint, actionlint
 
 ---
 
 ## Estado actual (Phase 0)
 
-Este repo está en **Phase 0** (fundación). Recursos que se crean:
+Este repo esta en **Phase 0** (fundacion). Recursos que se crean:
 
-- **2 buckets S3** (`orion-tfstate-dev`, `orion-tfstate-prod`) para state remoto
-  con versioning + AES256 + bloqueo de acceso público + native lockfile
+- **1 bucket S3** (`orion-tfstate-dev`) para state remoto con versioning
+  + AES256 + bloqueo de acceso publico + native lockfile.
 - **1 IAM OIDC provider** para GitHub Actions (thumbprint
-  `6938fd4d98bab03faadb97b34396831e3780aea1`)
-- **4 IAM roles OIDC** (uno por `(env, capability)`):
-  - `orion-terraform-plan-dev` (read-only, OIDC)
-  - `orion-terraform-apply-dev` (write, OIDC)
-  - `orion-terraform-plan-prod` (read-only, OIDC)
-  - `orion-terraform-apply-prod` (write, OIDC)
+  `6938fd4d98bab03faadb97b34396831e3780aea1`).
+- **2 IAM roles OIDC:**
+  - `orion-terraform-plan` (read-only, OIDC)
+  - `orion-terraform-apply` (write, OIDC)
 
-No hay VPC, NAT, endpoints, ni recursos runtime de ORION todavía — esos
+No hay VPC, NAT, endpoints, ni recursos runtime de ORION todavia - esos
 vienen en Phase 1+.
 
 ---
 
-## Multi-env setup (dev + prod)
+## Single-env setup (dev)
 
-| Aspecto | dev | prod |
-|---|---|---|
-| **Branch** | `dev` | `main` |
-| **GitHub Environment** | `dev` (sin reviewers, `auto-approve=true`) | `production` (con reviewer `@ahincho`) |
-| **State bucket** | `orion-tfstate-dev` | `orion-tfstate-prod` |
-| **State key** | `dev/terraform.tfstate` | `prod/terraform.tfstate` |
-| **AWS Region** | `us-east-1` | `us-east-1` |
-| **Locking** | S3 native lockfile | S3 native lockfile |
-| **Encryption** | AES256 server-side | AES256 server-side |
-| **Workflows reusables** | pinned `@dev` | pinned `@main` |
-| **Triggers** | push a `dev`, workflow_dispatch con `environment=dev` | push a `main`, workflow_dispatch con `environment=prod` |
+| Aspecto | dev |
+|---|---|
+| **Branch protegido** | `main` |
+| **GitHub Environment** | `dev` (sin reviewers, `auto-approve=true`) |
+| **State bucket** | `orion-tfstate-dev` |
+| **State key** | `dev/terraform.tfstate` |
+| **AWS Region** | `us-east-1` |
+| **Locking** | S3 native lockfile |
+| **Encryption** | AES256 server-side |
+| **Reusables pinning** | `@dev` (unico env) |
+| **Workflow triggers** | push a `main` (apply), PR a `main` (plan), `workflow_dispatch` |
 
-### Diagrama de flujo
+### Flujo
 
 ```
-PR abierto contra dev
-  └─> terraform-plan.yml corre Plan (dev)
-      ├─> Plan dev: working-dir=live/dev, bucket=orion-tfstate-dev
-      └─> Sticky comment en PR con tabla de cambios
+PR abierto contra main
+  â”€â–º terraform-plan.yml corre Plan (dev)
+      â”€â–º Sticky comment en PR con tabla de cambios
 
-Merge a dev branch
-  └─> terraform-apply.yml -> apply-dev
-      └─> GH Environment "dev" (auto-approve=true)
-
-PR de dev a main
-  └─> terraform-plan.yml corre Plan (prod) en el PR a main
-  └─> Aprobar
-  └─> Merge
-      └─> terraform-apply.yml -> apply-prod
-          └─> GH Environment "production" (requiere aprobación)
+PR mergeado a main (squash)
+  â”€â–º terraform-apply.yml â†’ Apply (dev)
+      â”€â–º GH Environment "dev" (auto-approve=true)
 ```
 
 ---
@@ -78,53 +68,52 @@ PR de dev a main
 ## Estructura
 
 ```
-orion-infrastructure-devops/
-├── AGENTS.md                              # Convenciones operacionales
-├── README.md                              # Este archivo
-├── LICENSE                                # MIT
-├── .gitignore
-├── .pre-commit-config.yaml                # terraform + shell + yaml hooks
-├── .tflint.hcl                            # Terraform lint rules
-├── .yamllint.yml                          # YAML lint rules
-├── .github/
-│   ├── CODEOWNERS                         # ahincho (solo)
-│   ├── dependabot.yml                     # Terraform providers + GH Actions
-│   ├── PULL_REQUEST_TEMPLATE.md
-│   └── workflows/
-│       ├── ci.yml                         # actionlint + yamllint (PR)
-│       ├── terraform-plan.yml             # caller → 01-devops/terraform-plan.yml
-│       └── terraform-apply.yml            # caller → 01-devops/terraform-apply.yml
-├── live/
-│   ├── dev/
-│   │   ├── main.tf                        # instantiate modules
-│   │   ├── outputs.tf
-│   │   ├── providers.tf
-│   │   ├── versions.tf
-│   │   ├── variables.tf
-│   │   ├── terraform.tfvars
-│   │   └── terraform.tfvars.example
-│   └── prod/                              # mismo esqueleto, valores prod
-├── modules/
-│   ├── storage-tfstate/                   # S3 bucket para state
-│   │   ├── main.tf
-│   │   ├── variables.tf
-│   │   ├── outputs.tf
-│   │   ├── versions.tf
-│   │   └── README.md
-│   └── oidc-github/                       # OIDC provider + 4 IAM roles
-│       ├── main.tf
-│       ├── variables.tf
-│       ├── outputs.tf
-│       ├── versions.tf
-│       └── README.md
-├── scripts/
-│   ├── bootstrap-backend.sh               # Crea buckets S3 (idempotente)
-│   ├── setup-oidc.sh                      # Crea OIDC provider + 4 roles
-│   ├── plan.sh                            # terraform plan wrapper
-│   └── apply.sh                           # terraform apply wrapper
-└── docs/
-    ├── SETUP.md                           # Pasos OIDC + GH Secrets + Envs
-    └── runbook-tfstate-recovery.md        # Escenarios de recuperacion de state
+orion-infrastructure/
+â”œâ”€â”€ AGENTS.md                              # Convenciones operacionales
+â”œâ”€â”€ README.md                              # Este archivo
+â”œâ”€â”€ LICENSE                                # MIT
+â”œâ”€â”€ .gitignore
+â”œâ”€â”€ .pre-commit-config.yaml                # terraform + shell + yaml hooks
+â”œâ”€â”€ .tflint.hcl                            # Terraform lint rules
+â”œâ”€â”€ .yamllint.yml                          # YAML lint rules
+â”œâ”€â”€ .github/
+â”‚   â”œâ”€â”€ CODEOWNERS                         # ahincho (solo)
+â”‚   â”œâ”€â”€ dependabot.yml                     # Terraform providers + GH Actions
+â”‚   â”œâ”€â”€ PULL_REQUEST_TEMPLATE.md
+â”‚   â””â”€â”€ workflows/
+â”‚       â”œâ”€â”€ ci.yml                         # actionlint + yamllint + tflint (PR)
+â”‚       â”œâ”€â”€ terraform-plan.yml             # caller â†’ spark-match-01-devops/terraform-plan.yml
+â”‚       â””â”€â”€ terraform-apply.yml            # caller â†’ spark-match-01-devops/terraform-apply.yml
+â”œâ”€â”€ live/
+â”‚   â””â”€â”€ dev/
+â”‚       â”œâ”€â”€ main.tf                        # instantiate modules
+â”‚       â”œâ”€â”€ outputs.tf
+â”‚       â”œâ”€â”€ providers.tf
+â”‚       â”œâ”€â”€ versions.tf
+â”‚       â”œâ”€â”€ variables.tf
+â”‚       â”œâ”€â”€ terraform.tfvars
+â”‚       â””â”€â”€ terraform.tfvars.example
+â”œâ”€â”€ modules/
+â”‚   â”œâ”€â”€ storage-tfstate/                   # S3 bucket para state
+â”‚   â”‚   â”œâ”€â”€ main.tf
+â”‚   â”‚   â”œâ”€â”€ variables.tf
+â”‚   â”‚   â”œâ”€â”€ outputs.tf
+â”‚   â”‚   â”œâ”€â”€ versions.tf
+â”‚   â”‚   â””â”€â”€ README.md
+â”‚   â””â”€â”€ oidc-github/                       # OIDC provider + 2 IAM roles
+â”‚       â”œâ”€â”€ main.tf
+â”‚       â”œâ”€â”€ variables.tf
+â”‚       â”œâ”€â”€ outputs.tf
+â”‚       â”œâ”€â”€ versions.tf
+â”‚       â””â”€â”€ README.md
+â”œâ”€â”€ scripts/
+â”‚   â”œâ”€â”€ bootstrap-backend.sh               # Crea bucket S3 (idempotente)
+â”‚   â”œâ”€â”€ setup-oidc.sh                      # Crea OIDC provider + 2 roles
+â”‚   â”œâ”€â”€ plan.sh                            # terraform plan wrapper
+â”‚   â””â”€â”€ apply.sh                           # terraform apply wrapper
+â””â”€â”€ docs/
+    â”œâ”€â”€ SETUP.md                           # Pasos OIDC + GH Secrets + Env
+    â””â”€â”€ runbook-tfstate-recovery.md        # Escenarios de recuperacion de state
 ```
 
 ---
@@ -134,35 +123,30 @@ orion-infrastructure-devops/
 - [Terraform](https://developer.hashicorp.com/terraform/install) `>= 1.6.0`
 - [AWS CLI](https://aws.amazon.com/cli/) configurado con un perfil o variables
 - [GitHub CLI](https://cli.github.com/) con permisos de admin en
-  `ahincho/orion-infrastructure-devops`
+  `ahincho/orion-infrastructure`
 - (Opcional) [pre-commit](https://pre-commit.com/) + [tflint](https://github.com/terraform-linters/tflint)
 
 ---
 
-## Bootstrap (primera vez por ambiente)
+## Bootstrap (primera vez)
 
 Antes del primer `terraform init`, hay que crear el bucket S3 para el state
-**fuera de Terraform** (chicken-and-egg: Terraform no puede crear su propio
-state bucket). El script es idempotente.
+**fuera de Terraform** (chicken-and-egg). El script es idempotente.
 
 ```bash
 chmod +x scripts/*.sh
-
-# Bootstrap dev
-ENVIRONMENT=dev AWS_REGION=us-east-1 ./scripts/bootstrap-backend.sh
-
-# Bootstrap prod
-ENVIRONMENT=prod AWS_REGION=us-east-1 ./scripts/bootstrap-backend.sh
+./scripts/bootstrap-backend.sh
 ```
 
-Esto crea el bucket `orion-tfstate-{env}` con:
+Esto crea el bucket `orion-tfstate-dev` con:
 - Versionado habilitado (obligatorio para state + lockfile)
-- Encriptación server-side AES256
-- Acceso público bloqueado (4 flags)
+- Encriptacion server-side AES256
+- Acceso publico bloqueado (4 flags)
 - Lock: `use_lockfile = true` (Terraform `>= 1.6`). **NO se crea tabla
   DynamoDB.**
 
 Verificar manualmente:
+
 ```bash
 aws s3api get-bucket-versioning --bucket orion-tfstate-dev
 aws s3api get-bucket-encryption --bucket orion-tfstate-dev
@@ -171,7 +155,7 @@ aws s3api get-public-access-block --bucket orion-tfstate-dev
 
 ---
 
-## Uso diario (dev)
+## Uso diario
 
 ```bash
 cd live/dev
@@ -187,64 +171,52 @@ terraform init -input=false \
 ./../../scripts/apply.sh dev
 ```
 
-Para prod: mismo flujo en `live/prod`.
-
 ---
 
 ## Workflow de cambios
 
-1. **Crear rama desde `dev`** con prefijo:
+1. **Crear rama desde `main`** con prefijo:
    - `feat/<descripcion-corta>` para nuevas features
    - `fix/<descripcion-corta>` para bugfixes
    - `chore/<descripcion-corta>` para housekeeping
    - `docs/<descripcion-corta>` para documentacion
 
 2. **Validar localmente**:
+
    ```bash
    pre-commit run --all-files
    cd live/dev && terraform init -backend=false && terraform validate
-   cd live/prod && terraform init -backend=false && terraform validate
    ```
 
-3. **Push a dev y abrir PR contra dev**:
-   - El PR dispara `CI - Lint & Security` (actionlint + yamllint).
+3. **Push y abrir PR contra main**:
+   - El PR dispara `CI - Lint & Security` (actionlint + yamllint + tflint).
    - El PR dispara `CD - Terraform Plan` que planea dev (sticky comment).
 
-4. **Merge via squash** a `dev`.
-
-5. **Sync a main (promover cambios)**:
-   - Abrir PR de `dev` a `main` con título `chore: sync dev into main`.
-   - Como admin, mergear con bypass.
-   - Esto triggerea `CD - Terraform Apply - production` que requiere
-     aprobación manual del GH Environment `production`.
+4. **Merge via squash** a `main`. Esto triggerea `CD - Terraform Apply`
+   automaticamente contra el GH Environment `dev` (auto-approve).
 
 ---
 
-## Añadir un nuevo módulo
+## Anadir un nuevo modulo
 
 1. `mkdir -p modules/<nombre>`
 2. Crear `main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`, `README.md`
-3. Agregar un bloque `module "<nombre>"` en `live/dev/main.tf` y
-   `live/prod/main.tf`
-4. (Opcional) agregar variables en `live/{dev,prod}/variables.tf` y defaults
-   en `terraform.tfvars`
+3. Agregar un bloque `module "<nombre>"` en `live/dev/main.tf`
 
 ---
 
-## 🔐 Autenticación AWS: OIDC
+## Autenticacion AWS: OIDC
 
-GitHub Actions asume roles IAM en AWS vía **OIDC** (sin access keys de larga
-duración). Trust policy restringida al repo
-`ahincho/orion-infrastructure-devops`.
+GitHub Actions asume roles IAM en AWS via **OIDC** (sin access keys de larga
+duracion). Trust policy restringida al repo
+`ahincho/orion-infrastructure` + main branch + GH Environment `dev`.
 
 ### Roles Terraform plan/apply (creados por `modules/oidc-github`)
 
-| Role | ARN (formato) | Trust policy | Secret en GH |
+| Role | ARN (formato) | Permisos | Secret en GH |
 |---|---|---|---|
-| `orion-terraform-plan-dev` | `arn:aws:iam::{account}:role/orion-terraform-plan-dev` | `repo:ahincho/orion-infrastructure-devops:ref:refs/heads/dev` + `pull_request` + `environment:dev` | `AWS_PLAN_ROLE_ARN_DEV` |
-| `orion-terraform-apply-dev` | `arn:aws:iam::{account}:role/orion-terraform-apply-dev` | `repo:...:ref:refs/heads/dev` + `pull_request` + `environment:dev` | `AWS_APPLY_ROLE_ARN_DEV` |
-| `orion-terraform-plan-prod` | `arn:aws:iam::{account}:role/orion-terraform-plan-prod` | `repo:...:ref:refs/heads/main` + `pull_request` + `environment:production` | `AWS_PLAN_ROLE_ARN_PROD` |
-| `orion-terraform-apply-prod` | `arn:aws:iam::{account}:role/orion-terraform-apply-prod` | `repo:...:ref:refs/heads/main` + `pull_request` + `environment:production` | `AWS_APPLY_ROLE_ARN_PROD` |
+| `orion-terraform-plan` | `arn:aws:iam::{account}:role/orion-terraform-plan` | read-only sobre AWS | `AWS_PLAN_ROLE_ARN` |
+| `orion-terraform-apply` | `arn:aws:iam::{account}:role/orion-terraform-apply` | `Action:*` restringido a region | `AWS_APPLY_ROLE_ARN` |
 
 > El caller `terraform-plan.yml` corre plan con `-lock=false` porque el S3
 > native lockfile requiere `PutObject` (write). El plan es read-only por
@@ -254,4 +226,4 @@ duración). Trust policy restringida al repo
 
 ## Licencia
 
-MIT — ver `LICENSE`.
+MIT - ver `LICENSE`.
