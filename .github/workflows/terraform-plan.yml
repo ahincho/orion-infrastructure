@@ -34,16 +34,6 @@ permissions:
   id-token: write
 
 jobs:
-  diag:
-    name: OIDC diagnostic
-    runs-on: ubuntu-latest
-    steps:
-      - name: Decode OIDC token
-        run: |
-          JWT=$(curl -sH "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-                 "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")
-          PAYLOAD=$(echo "$JWT" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null || true)
-          echo "::notice::oidc_claims=${PAYLOAD}"
   plan:
     name: Plan (dev)
     uses: ahincho/spark-match-01-devops/.github/workflows/terraform-plan.yml@7d8797d7d36c9b61dc31afb7e95e861d10267051
