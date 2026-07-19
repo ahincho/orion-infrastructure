@@ -18,18 +18,6 @@ variable "environment" {
   }
 }
 
-variable "aws_region" {
-  description = "Region AWS donde se crea el bucket."
-  type        = string
-  default     = "us-east-1"
-}
-
-variable "force_destroy" {
-  description = "Si true, permite borrar el bucket aunque tenga objetos (PELIGROSO en prod)."
-  type        = bool
-  default     = false
-}
-
 variable "lifecycle_transition_to_ia_days" {
   description = "Dias antes de transicionar objetos a Infrequent Access. 0 = deshabilitado."
   type        = number
