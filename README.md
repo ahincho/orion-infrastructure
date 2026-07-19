@@ -12,7 +12,7 @@ Infraestructura AWS del proyecto **ORION** (Sistema Cognitivo), gestionada con
 ## Stack
 
 - **Cloud:** AWS (default `us-east-1`, cuenta dev `681526276858`)
-- **IaC:** Terraform `>= 1.6.0` (validado en `1.15.7`), provider `hashicorp/aws ~> 5.40`
+- **IaC:** Terraform `>= 1.6.0` (validado en `1.15.7`), provider `hashicorp/aws ~> 6.55`
 - **AWS CLI local:** perfil `orion-admin` (AdministratorAccess).
 - **Backend:** S3 + native lockfile (`use_lockfile = true`)
 - **Pipelines:** [Reusable workflows](https://github.com/spark-match/spark-match-01-devops/tree/dev/.github/workflows)
@@ -23,7 +23,7 @@ Infraestructura AWS del proyecto **ORION** (Sistema Cognitivo), gestionada con
   `terraform-apply.yml` por una razon tecnica: los callers invocan
   reusables via `uses:` y por tanto no pueden declarar `environment:`
   (regla de GitHub Actions), lo que impide el acceso a GH Env vars.
-- **Linting:** tflint, terraform fmt, pre-commit-terraform, yamllint, actionlint
+- **Linting:** actionlint, gitleaks, yamllint, tflint, terraform fmt, terraform validate, checkov (todos como atomic reusables desde `spark-match-01-devops@dev`)
 
 ---
 
@@ -88,7 +88,7 @@ orion-infrastructure/
 â”‚   â”œâ”€â”€ dependabot.yml                     # Terraform providers + GH Actions
 â”‚   â”œâ”€â”€ PULL_REQUEST_TEMPLATE.md
 â”‚   â””â”€â”€ workflows/
-â”‚       â”œâ”€â”€ ci.yml                         # actionlint + yamllint + tflint (PR)
+â”‚       â”œâ”€â”€ ci.yml                         # 7 atomic reusables (lint+security, PR)
 â”‚       â”œâ”€â”€ terraform-plan.yml             # caller â†’ spark-match-01-devops/terraform-plan.yml
 â”‚       â””â”€â”€ terraform-apply.yml            # caller â†’ spark-match-01-devops/terraform-apply.yml
 â”œâ”€â”€ live/
