@@ -4,6 +4,13 @@
 # Caller del reusable en spark-match/spark-match-01-devops@dev.
 # Unico env (dev). Trigger: pull_request contra main + workflow_dispatch.
 #
+# Los inputs viven hardcoded aqui a proposito (ver AGENTS.md "Convenciones
+# Terraform / GH Actions vars"). El reusable workflow se invoca con `uses:`
+# lo que impide declarar `environment:` en este job (regla de GitHub
+# Actions) y por tanto no permite leer GH Environment variables desde aca.
+# La version de Terraform si es repo-scoped var (TF_VERSION) porque cambia
+# menos seguido y conviene tenerla centralizada.
+#
 # Pin @dev: reusables se prueban en dev antes de promover a main.
 # =============================================================================
 
@@ -36,7 +43,7 @@ jobs:
       working-directory: live/dev
       aws-region: us-east-1
       plan-role-arn-secret: AWS_PLAN_ROLE_ARN
-      terraform-version: "1.10.0"
+      terraform-version: ${{ vars.TF_VERSION }}
       backend-bucket: orion-tfstate-dev
       backend-key: dev/terraform.tfstate
       comment-on-pr: true

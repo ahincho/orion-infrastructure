@@ -1,0 +1,13 @@
+# Gitleaks ignore file
+# https://github.com/zricethezav/gitleaks/blob/master/README.md
+#
+# We have one intentional entry: a rotated AWS access key
+# (used by user orion-admin) leaked in commit a98a008563.
+# That AKIA was deleted via `aws iam delete-access-key` on
+# 2026-07-19 and a fresh key was issued. The leaked string
+# remains in git history but is now dead (IAM will reject it).
+#
+# Format: <commit_sha>:<path>:<rule_id>:<fingerprint>
+# The fingerprint is intentionally NOT the real key value.
+
+a98a008563d7736f7e0c3ef06ddedf14ca67f382:scripts/bootstrap-backend.sh:aws-access-token:<ROTATED-2026-07-19>

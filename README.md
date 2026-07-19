@@ -11,11 +11,18 @@ Infraestructura AWS del proyecto **ORION** (Sistema Cognitivo), gestionada con
 
 ## Stack
 
-- **Cloud:** AWS (default `us-east-1`, cuenta TBD por el owner)
-- **IaC:** Terraform `>= 1.6.0`, provider `hashicorp/aws ~> 5.40`
+- **Cloud:** AWS (default `us-east-1`, cuenta dev `681526276858`)
+- **IaC:** Terraform `>= 1.6.0` (validado en `1.15.7`), provider `hashicorp/aws ~> 5.40`
+- **AWS CLI local:** perfil `orion-admin` (AdministratorAccess).
 - **Backend:** S3 + native lockfile (`use_lockfile = true`)
 - **Pipelines:** [Reusable workflows](https://github.com/spark-match/spark-match-01-devops/tree/main/.github/workflows)
   desde `spark-match/spark-match-01-devops` pinneados `@dev`.
+- **Config de workflows:** unica variable repo-scoped = `TF_VERSION`
+  (`1.15.7`). El resto (environment, region, working-dir, backend-bucket,
+  backend-key, flags) vive hardcoded en `terraform-plan.yml` /
+  `terraform-apply.yml` por una razon tecnica: los callers invocan
+  reusables via `uses:` y por tanto no pueden declarar `environment:`
+  (regla de GitHub Actions), lo que impide el acceso a GH Env vars.
 - **Linting:** tflint, terraform fmt, pre-commit-terraform, yamllint, actionlint
 
 ---
@@ -121,7 +128,10 @@ orion-infrastructure/
 ## Pre-requisitos
 
 - [Terraform](https://developer.hashicorp.com/terraform/install) `>= 1.6.0`
+  (recomendado `1.15.7`; la version exacta que se usa en CI/CD esta
+  en la repo-scoped GH variable `TF_VERSION`)
 - [AWS CLI](https://aws.amazon.com/cli/) configurado con un perfil o variables
+  (este repo espera el perfil `orion-admin` para los scripts locales de bootstrap)
 - [GitHub CLI](https://cli.github.com/) con permisos de admin en
   `ahincho/orion-infrastructure`
 - (Opcional) [pre-commit](https://pre-commit.com/) + [tflint](https://github.com/terraform-linters/tflint)
@@ -134,6 +144,7 @@ Antes del primer `terraform init`, hay que crear el bucket S3 para el state
 **fuera de Terraform** (chicken-and-egg). El script es idempotente.
 
 ```bash
+export AWS_PROFILE=orion-admin
 chmod +x scripts/*.sh
 ./scripts/bootstrap-backend.sh
 ```
@@ -142,8 +153,8 @@ Esto crea el bucket `orion-tfstate-dev` con:
 - Versionado habilitado (obligatorio para state + lockfile)
 - Encriptacion server-side AES256
 - Acceso publico bloqueado (4 flags)
-- Lock: `use_lockfile = true` (Terraform `>= 1.6`). **NO se crea tabla
-  DynamoDB.**
+- Lock: `use_lockfile = true` (Terraform `>= 1.6`, validado en `1.15.7`).
+  **NO se crea tabla DynamoDB.**
 
 Verificar manualmente:
 
@@ -152,6 +163,35 @@ aws s3api get-bucket-versioning --bucket orion-tfstate-dev
 aws s3api get-bucket-encryption --bucket orion-tfstate-dev
 aws s3api get-public-access-block --bucket orion-tfstate-dev
 ```
+
+---
+
+## GH Actions Variables (repo-scoped)
+
+```bash
+# unica variable: version de Terraform que usan todos los workflows
+gh variable set TF_VERSION --repo ahincho/orion-infrastructure --body "1.15.7"
+
+gh variable list --repo ahincho/orion-infrastructure
+```
+
+| Variable | Valor dev | Proposito |
+|---|---|---|
+| `TF_VERSION` | `1.15.7` | version Terraform usada por todos los jobs (tflint + callers reusable) |
+
+Los nombres de los Secrets (`AWS_PLAN_ROLE_ARN`, `AWS_APPLY_ROLE_ARN`)
+quedan literales en los `with:` porque apuntan a la entrada del secret,
+no a su valor.
+
+Resto de config (environment, region, working-dir, backend-bucket, backend-key,
+flags de comment-on-pr y auto-approve) vive hardcoded en los callers
+`terraform-plan.yml` / `terraform-apply.yml`. La razon tecnica es que un
+job que invoca un reusable workflow via `uses:` no puede declarar
+`environment:` (regla GitHub Actions), por lo tanto no puede acceder a
+GH Environment variables; las repo-scoped son las unicas que funcionan.
+
+Para production en el futuro se duplican los callers con valores
+hardcoded para prod.
 
 ---
 
