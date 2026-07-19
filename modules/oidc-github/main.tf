@@ -31,20 +31,23 @@ locals {
     }
   )
 
-  # Sub claim patterns: el OIDC token tiene `sub` con formato
-  #   repo:<owner>/<repo>:ref:refs/heads/<branch>
-  #   repo:<owner>/<repo>:pull_request
-  #   repo:<owner>/<repo>:environment:<env_name>
+  # GitHub owner derivado de var.github_repository (formato owner/repo).
+  # Se usa @* wildcard en los sub patterns porque GitHub emite
+  # repo:OWNER@NUMID/REPO@NUMID:EVENT para repos publicos. Sin @* los
+  # tokens OIDC de repos publicos son rechazados por la trust policy.
+  github_owner = split("/", var.github_repository)[0]
+
+  # Sub claim patterns por role:
+  #   - plan: solo pull_request (read-only, corre en PRs)
+  #   - apply: solo ref:refs/heads/main + environment:dev (write, corre
+  #     en push a main + environment deployment)
   plan_sub_patterns = [
-    "repo:${var.github_repository}:ref:refs/heads/main",
-    "repo:${var.github_repository}:pull_request",
-    "repo:${var.github_repository}:environment:dev",
+    "repo:${local.github_owner}@*:pull_request",
   ]
 
   apply_sub_patterns = [
-    "repo:${var.github_repository}:ref:refs/heads/main",
-    "repo:${var.github_repository}:pull_request",
-    "repo:${var.github_repository}:environment:dev",
+    "repo:${local.github_owner}@*:ref:refs/heads/main",
+    "repo:${local.github_owner}@*:environment:dev",
   ]
 }
 
@@ -55,12 +58,12 @@ locals {
 #
 # URL: https://token.actions.githubusercontent.com
 # ClientId: sts.amazonaws.com (audiencia = AWS STS)
-# Thumbprint: 6938fd4d98bab03faadb97b34396831e3780aea1 (estable desde 2023)
+# Thumbprints: 6938fd4d... (estable desde 2023) + a6840fac... (nuevo cert, 2026)
 ###############################################################################
 resource "aws_iam_openid_connect_provider" "github" {
   url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = [var.oidc_provider_thumbprint]
+  thumbprint_list = var.oidc_provider_thumbprints
 
   tags = local.common_tags
 }

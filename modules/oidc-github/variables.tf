@@ -24,10 +24,13 @@ variable "github_repository" {
   }
 }
 
-variable "oidc_provider_thumbprint" {
-  description = "Thumbprint del certificado del OIDC provider de GitHub Actions (estable desde 2023)."
-  type        = string
-  default     = "6938fd4d98bab03faadb97b34396831e3780aea1"
+variable "oidc_provider_thumbprints" {
+  description = "Thumbprints de los certificados del OIDC provider de GitHub Actions. GitHub rota certificados; mantener ambos durante la transicion."
+  type        = list(string)
+  default = [
+    "6938fd4d98bab03faadb97b34396831e3780aea1",
+    "a6840fac8d59c1b2737d22c4dd2d7485b69e9b8e",
+  ]
 }
 
 variable "iam_role_max_session_duration" {
