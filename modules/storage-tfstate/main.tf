@@ -104,11 +104,20 @@ resource "aws_s3_bucket_lifecycle_configuration" "tfstate" {
 
     filter {}
 
-    noncurrent_version_transition {
-      noncurrent_days          = var.lifecycle_transition_to_ia_days > 0 ? var.lifecycle_transition_to_ia_days : null
-      storage_class            = var.lifecycle_transition_to_ia_days > 0 ? "STANDARD_IA" : null
-      noncurrent_days_to_glacier = var.lifecycle_transition_to_glacier_days > 0 ? var.lifecycle_transition_to_glacier_days : null
-      glacier_storage_class    = var.lifecycle_transition_to_glacier_days > 0 ? "GLACIER" : null
+    dynamic "noncurrent_version_transition" {
+      for_each = var.lifecycle_transition_to_ia_days > 0 ? [1] : []
+      content {
+        noncurrent_days = var.lifecycle_transition_to_ia_days
+        storage_class   = "STANDARD_IA"
+      }
+    }
+
+    dynamic "noncurrent_version_transition" {
+      for_each = var.lifecycle_transition_to_glacier_days > 0 ? [1] : []
+      content {
+        noncurrent_days = var.lifecycle_transition_to_glacier_days
+        storage_class   = "GLACIER"
+      }
     }
   }
 }

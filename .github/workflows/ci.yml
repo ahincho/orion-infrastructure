@@ -41,13 +41,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout repository
+      # gitleaks-action@v3 hardcodes `git log -p <sha>^..<sha>` and ignores
+      # our `args` input (the `args:` field is silently dropped in v3's
+      # action.yml). With a default shallow checkout (fetch-depth: 1),
+      # dependabot's 1-commit branches break: `<sha>^` doesn't exist in
+      # the local repo, so the action exits with code 1.
+      #
+      # Fix: use `fetch-depth: 0` so every commit's parent is in the local
+      # repo. gitleaks-action then successfully scans the diff
+      # `<head>^..<head>` — which contains only the PR's commit content —
+      # matching what `git diff` would show for the PR. No need to scan
+      # the whole history because each PR contains at most its own
+      # commit's worth of new code.
+      - name: Checkout repository (full history for gitleaks v3)
         uses: actions/checkout@v6
-
-      - name: Run gitleaks (working tree only)
-        uses: gitleaks/gitleaks-action@v1
         with:
-          args: --no-git --redact
+          fetch-depth: 0
+
+      - name: Run gitleaks (latest version)
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

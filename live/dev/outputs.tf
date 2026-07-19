@@ -1,6 +1,6 @@
 output "state_bucket_name" {
   description = "Nombre del bucket S3 donde vive el state de Terraform."
-  value       = module.storage_tfstate.bucket_name
+  value       = module.storage_tfstate.bucket_id
 }
 
 output "oidc_provider_arn" {

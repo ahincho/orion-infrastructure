@@ -19,7 +19,7 @@ module "storage_tfstate" {
 
   project_name = var.project_name
   environment  = var.environment
-  aws_region   = var.aws_region
+  tags         = local.common_tags
 }
 
 ###############################################################################
