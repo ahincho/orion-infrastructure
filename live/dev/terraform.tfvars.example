@@ -1,0 +1,10 @@
+# =============================================================================
+# Ejemplo de terraform.tfvars para live/dev.
+# COPIAR a terraform.tfvars (sin sufijo .example) y ajustar si es necesario.
+# NO commitea terraform.tfvars si tiene secretos.
+# =============================================================================
+
+aws_region          = "us-east-1"
+project_name        = "orion"
+environment         = "dev"
+github_repository   = "ahincho/orion-infrastructure-devops"
