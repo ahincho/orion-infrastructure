@@ -1,7 +1,7 @@
 # =============================================================================
 # CD - Terraform Apply
 # =============================================================================
-# Caller del reusable en spark-match/spark-match-01-devops@dev.
+# Caller del reusable en spark-match/spark-match-01-devops@main.
 # Trigger: push a main (auto-deploy a dev env).
 #
 # Los inputs viven hardcoded aqui a proposito (ver AGENTS.md "Convenciones
@@ -35,7 +35,7 @@ permissions:
 jobs:
   apply:
     name: Apply (dev)
-    uses: spark-match/spark-match-01-devops/.github/workflows/terraform-apply.yml@dev
+    uses: spark-match/spark-match-01-devops/.github/workflows/terraform-apply.yml@main
     secrets:
       AWS_APPLY_ROLE_ARN: ${{ secrets.AWS_APPLY_ROLE_ARN }}
     with:

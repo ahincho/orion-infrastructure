@@ -1,7 +1,7 @@
 # =============================================================================
 # CI - Terraform Plan
 # =============================================================================
-# Caller del reusable en spark-match/spark-match-01-devops@dev.
+# Caller del reusable en spark-match/spark-match-01-devops@main.
 # Unico env (dev). Trigger: pull_request contra main + workflow_dispatch.
 #
 # Los inputs viven hardcoded aqui a proposito (ver AGENTS.md "Convenciones
@@ -11,7 +11,9 @@
 # La version de Terraform si es repo-scoped var (TF_VERSION) porque cambia
 # menos seguido y conviene tenerla centralizada.
 #
-# Pin @dev: reusables se prueban en dev antes de promover a main.
+# Pin @main (antes @dev): los reusables fueron promovidos de @dev a @main
+# en spark-match-01-devops PR #45 despues de validacion end-to-end
+# (orion-infrastructure PR #24 con 8/8 checks verdes).
 # =============================================================================
 
 name: CI - Terraform Plan
@@ -36,7 +38,7 @@ permissions:
 jobs:
   plan:
     name: Plan (dev)
-    uses: spark-match/spark-match-01-devops/.github/workflows/terraform-plan.yml@dev
+    uses: spark-match/spark-match-01-devops/.github/workflows/terraform-plan.yml@main
     secrets:
       AWS_PLAN_ROLE_ARN: ${{ secrets.AWS_PLAN_ROLE_ARN }}
     with:

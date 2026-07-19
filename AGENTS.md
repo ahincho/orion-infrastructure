@@ -26,8 +26,11 @@ Este repo define la **infraestructura AWS del proyecto**.
   Alternativo: `spark-match-admin` (mismo nivel, otra cuenta de uso).
 - **Backend:** S3 + native S3 lockfile (sin DynamoDB)
 - **CI/CD:** GitHub Actions, reusable workflows desde
-  `spark-match/spark-match-01-devops` (pinneados `@dev`).
-- **Pin de reusables:** siempre `@dev` (este repo solo tiene dev).
+  `spark-match/spark-match-01-devops` (pinneados `@main`).
+- **Pin de reusables:** siempre `@main`. Los reusables fueron promovidos de
+  `@dev` -> `@main` despues de validacion end-to-end (PR #24 con 8/8 checks
+  verdes + spark-match-01-devops PR #45). Futuros cambios en reusables se
+  prueban primero en `@dev` y se promueve en una segunda PR.
 - **Ambientes AWS:** 1 unico (`dev`). No hay production.
 
 ## Convenciones Terraform / GH Actions vars
