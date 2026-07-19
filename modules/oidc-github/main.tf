@@ -121,9 +121,8 @@ resource "aws_iam_role_policy" "plan" {
         "iam:List*",
         "kms:Describe*",
         "kms:List*",
-        "s3:GetObject",
-        "s3:GetObjectVersion",
-        "s3:ListBucket",
+        "s3:Get*",
+        "s3:List*",
         "sts:GetCallerIdentity",
       ]
       Resource = "*"
