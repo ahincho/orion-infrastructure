@@ -1,3 +1,24 @@
+# =============================================================================
+# CI - Lint & Security
+# =============================================================================
+# Pull request linter. Calls the seven ecosystem reusables from
+# `spark-match/spark-match-01-devops/.github/workflows/...` (all pinned `@dev`
+# per AGENTS.md). Each job is a thin `uses:` dispatch; source of truth lives in
+# spark-match-01-devops so all ORION repos get the same checks without drift.
+#
+# Jobs:
+#   - actionlint         :: GH Actions syntax  (ecosystem, since PR #41)
+#   - gitleaks           :: secret history     (ecosystem, since PR #41, v1 pin)
+#   - yamllint           :: YAML lint          (ecosystem, since PR #41)
+#   - terraform-fmt      :: terraform fmt      (ecosystem, since PR #43)
+#   - terraform-validate :: terraform validate (ecosystem, since PR #43)
+#   - tflint             :: tflint             (ecosystem, since PR #43)
+#   - checkov            :: checkov SCA        (ecosystem, since PR #43)
+#
+# No secrets forwarded. Terraform-version is the one repo-scoped var we read
+# from the caller side (per AGENTS.md "Convenciones Terraform / GH Actions vars").
+# =============================================================================
+
 name: CI - Lint & Security
 
 on:
@@ -15,151 +36,58 @@ on:
 permissions:
   contents: read
 
+# Cancel in-progress runs for the same PR + branch. Saves runner minutes on
+# rapid pushes. The cancel-in-progress: true is safe for lint jobs (idempotent).
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # ---------- ecosystem reusables ------------------------------------------------
+
   actionlint:
     name: actionlint
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Download actionlint binary
-        id: get_actionlint
-        run: bash <(curl --fail --silent --show-error --location https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash)
-        shell: bash
-
-      - name: Run actionlint
-        run: ${{ steps.get_actionlint.outputs.executable }} -color
+    uses: spark-match/spark-match-01-devops/.github/workflows/actionlint.yml@dev
+    with:
+      environment-name: ci
 
   gitleaks:
     name: gitleaks
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      # gitleaks-action@v3 hardcodes `git log -p <sha>^..<sha>` and ignores
-      # our `args` input (the `args:` field is silently dropped in v3's
-      # action.yml). With a default shallow checkout (fetch-depth: 1),
-      # dependabot's 1-commit branches break: `<sha>^` doesn't exist in
-      # the local repo, so the action exits with code 1.
-      #
-      # Fix: use `fetch-depth: 0` so every commit's parent is in the local
-      # repo. gitleaks-action then successfully scans the diff
-      # `<head>^..<head>` — which contains only the PR's commit content —
-      # matching what `git diff` would show for the PR. No need to scan
-      # the whole history because each PR contains at most its own
-      # commit's worth of new code.
-      - name: Checkout repository (full history for gitleaks v3)
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Run gitleaks (latest version)
-        uses: gitleaks/gitleaks-action@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    uses: spark-match/spark-match-01-devops/.github/workflows/gitleaks.yml@dev
+    with:
+      environment-name: ci
 
   yamllint:
     name: yamllint
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
+    uses: spark-match/spark-match-01-devops/.github/workflows/yamllint.yml@dev
+    with:
+      environment-name: ci
 
-      - name: Install yamllint
-        run: pip install --quiet yamllint==1.35.1
-
-      - name: Run yamllint
-        run: yamllint .
-
-  tflint:
-    name: tflint
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v4
-        with:
-          terraform_version: ${{ vars.TF_VERSION }}
-
-      - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@v6
-        with:
-          tflint_version: latest
-
-      - name: Run tflint
-        run: tflint --recursive
+  # ---------- terraform ecosystem reusables (PR #43) -----------------------------
 
   terraform-fmt:
     name: terraform fmt
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v4
-        with:
-          terraform_version: ${{ vars.TF_VERSION }}
-
-      - name: Run terraform fmt -check
-        run: terraform fmt -check -recursive -diff
+    uses: spark-match/spark-match-01-devops/.github/workflows/terraform-fmt.yml@dev
+    with:
+      environment-name: ci
+      terraform-version: ${{ vars.TF_VERSION }}
 
   terraform-validate:
     name: terraform validate
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
+    uses: spark-match/spark-match-01-devops/.github/workflows/terraform-validate.yml@dev
+    with:
+      environment-name: ci
+      terraform-version: ${{ vars.TF_VERSION }}
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v4
-        with:
-          terraform_version: ${{ vars.TF_VERSION }}
-
-      # init -backend=false por directorio: descarga providers sin tocar el
-      # backend S3 (no requiere creds AWS). Valida live/dev + los 2 modulos.
-      - name: terraform init -backend=false (por modulo)
-        run: |
-          set -euo pipefail
-          for d in live/dev modules/storage-tfstate modules/oidc-github; do
-            echo "::group::init $d"
-            terraform -chdir="$d" init -backend=false -upgrade=false
-            echo "::endgroup::"
-          done
-
-      - name: terraform validate (por modulo)
-        run: |
-          set -euo pipefail
-          for d in live/dev modules/storage-tfstate modules/oidc-github; do
-            echo "::group::validate $d"
-            terraform -chdir="$d" validate
-            echo "::endgroup::"
-          done
+  tflint:
+    name: tflint
+    uses: spark-match/spark-match-01-devops/.github/workflows/tflint.yml@dev
+    with:
+      environment-name: ci
+      terraform-version: ${{ vars.TF_VERSION }}
 
   checkov:
     name: checkov
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Install checkov
-        run: pip install --quiet checkov==3.2.415
-
-      # Hard fail: los hallazgos justificados se skippean inline en los .tf
-      # via `# checkov:skip=CKV_AWS_XX:reason`. Si checkov falla, revisar el
-      # nuevo finding y agregar skip con justificacion o fixear el recurso.
-      - name: Run checkov
-        run: checkov --directory . --framework terraform --compact
+    uses: spark-match/spark-match-01-devops/.github/workflows/checkov.yml@dev
+    with:
+      environment-name: ci
