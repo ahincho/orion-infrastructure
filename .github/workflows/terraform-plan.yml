@@ -37,8 +37,7 @@ jobs:
   plan:
     name: Plan (dev)
     uses: spark-match/spark-match-01-devops/.github/workflows/terraform-plan.yml@698c211c266ae676f7be3c984c670478ee597f4f
-    secrets:
-      AWS_PLAN_ROLE_ARN: ${{ secrets.AWS_PLAN_ROLE_ARN }}
+    secrets: inherit
     with:
       environment: dev
       working-directory: live/dev
