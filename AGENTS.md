@@ -91,9 +91,14 @@ El script `docs/SETUP.md` documenta los pasos para `gh secret set`.
    de pegarlo en el codigo. **Si una key se filtra al repo por error,
    rotala inmediatamente en la consola de AWS** — el key ID viejo en
    `git log` es entonces texto muerto.
-2. **Nunca** commitear `.tfstate`, `.terraform/`, `.terraform.lock.hcl`,
-   ni archivos con secretos fuera de GH Secrets. `.gitignore` ya los
-   excluye; respeta la convencion.
+2. **Nunca** commitear `.tfstate`, `.terraform/`, ni archivos con
+   secretos fuera de GH Secrets. `.gitignore` ya los excluye; respeta
+   la convencion.
+   
+   **Excepcion:** `.terraform.lock.hcl` **SI se commitea** (uno por
+   directorio con `versions.tf`) para garantizar reproducibilidad de
+   providers en CI/CD. El `.gitignore` lo permite explicitamente con
+   `!*.terraform.lock.hcl`.
 3. **Reglas de branching:** PR a `main` directo, squash-only, branch
    borrada tras merge. NO crear rama `dev/` ni `feature/*` larga vida.
 
