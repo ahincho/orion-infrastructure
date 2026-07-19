@@ -29,3 +29,9 @@ variable "lifecycle_transition_to_glacier_days" {
   type        = number
   default     = 0
 }
+
+variable "tags" {
+  description = "Tags adicionales aplicados al bucket S3 y sus recursos hijos."
+  type        = map(string)
+  default     = {}
+}
