@@ -1,7 +1,7 @@
 # =============================================================================
 # CI - Terraform Plan
 # =============================================================================
-# Caller del reusable en ahincho/spark-match-01-devops@dev.
+# Caller del reusable en spark-match/spark-match-01-devops@dev.
 # Unico env (dev). Trigger: pull_request contra main + workflow_dispatch.
 #
 # Los inputs viven hardcoded aqui a proposito (ver AGENTS.md "Convenciones
@@ -36,8 +36,9 @@ permissions:
 jobs:
   plan:
     name: Plan (dev)
-    uses: ahincho/spark-match-01-devops/.github/workflows/terraform-plan.yml@dev
-    secrets: inherit
+    uses: spark-match/spark-match-01-devops/.github/workflows/terraform-plan.yml@dev
+    secrets:
+      AWS_PLAN_ROLE_ARN: ${{ secrets.AWS_PLAN_ROLE_ARN }}
     with:
       environment: dev
       working-directory: live/dev

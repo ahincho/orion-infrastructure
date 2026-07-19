@@ -2,7 +2,7 @@
 
 Infraestructura AWS del proyecto **ORION** (Sistema Cognitivo), gestionada con
 **Terraform puro** y pipelines reutilizables desde
-`ahincho/spark-match-01-devops`.
+`spark-match/spark-match-01-devops`.
 
 > **Owner:** `@ahincho` (solo, proyecto rapido)
 > **Repo:** [ahincho/orion-infrastructure](https://github.com/ahincho/orion-infrastructure)
@@ -15,8 +15,8 @@ Infraestructura AWS del proyecto **ORION** (Sistema Cognitivo), gestionada con
 - **IaC:** Terraform `>= 1.6.0` (validado en `1.15.7`), provider `hashicorp/aws ~> 5.40`
 - **AWS CLI local:** perfil `orion-admin` (AdministratorAccess).
 - **Backend:** S3 + native lockfile (`use_lockfile = true`)
-- **Pipelines:** [Reusable workflows](https://github.com/ahincho/spark-match-01-devops/tree/dev/.github/workflows)
-  desde `ahincho/spark-match-01-devops` pinneados `@dev`.
+- **Pipelines:** [Reusable workflows](https://github.com/spark-match/spark-match-01-devops/tree/dev/.github/workflows)
+  desde `spark-match/spark-match-01-devops` pinneados `@dev`.
 - **Config de workflows:** unica variable repo-scoped = `TF_VERSION`
   (`1.15.7`). El resto (environment, region, working-dir, backend-bucket,
   backend-key, flags) vive hardcoded en `terraform-plan.yml` /
