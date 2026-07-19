@@ -41,35 +41,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout repository
+      # gitleaks-action@v3 hardcodes `git log -p <sha>^..<sha>` and ignores
+      # our `args` input (the `args:` field is silently dropped in v3's
+      # action.yml). With a default shallow checkout (fetch-depth: 1),
+      # dependabot's 1-commit branches break: `<sha>^` doesn't exist in
+      # the local repo, so the action exits with code 1.
+      #
+      # Fix: use `fetch-depth: 0` so every commit's parent is in the local
+      # repo. gitleaks-action then successfully scans the diff
+      # `<head>^..<head>` — which contains only the PR's commit content —
+      # matching what `git diff` would show for the PR. No need to scan
+      # the whole history because each PR contains at most its own
+      # commit's worth of new code.
+      - name: Checkout repository (full history for gitleaks v3)
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-      # We run gitleaks directly instead of using the `gitleaks/gitleaks-action`
-      # third-party action. Rationale: every release of that action
-      # (v1, v2, v3) hardcodes `git log -p <sha>^..<sha>` and silently
-      # ignores the `args:` input that would let us pass `--no-git`.
-      # That history scan breaks on the 1-commit branches produced by
-      # dependabot (parent commit `<sha>^` does not exist in a shallow
-      # checkout). Running gitleaks ourselves means:
-      #   - we always scan only the working tree (`--no-git`)
-      #   - no action-version dependency, no Node 20 EOL risk
-      #   - secrets in output are redacted (`--redact`)
-      # Binary version is pinned to a tag; bump via Dependabot (regular
-      # `github-actions` ecosystem would not detect this — we leave it
-      # to manual review since gitleaks is a security tool).
-      - name: Run gitleaks (working tree only, pinned binary)
+      - name: Run gitleaks (latest version)
+        uses: gitleaks/gitleaks-action@v3
         env:
-          GITLEAKS_VERSION: "8.24.3"
-        run: |
-          set -euo pipefail
-          ARCH="linux_x64"
-          URL="https://github.com/zricethezav/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_${ARCH}.tar.gz"
-          echo "Downloading gitleaks v${GITLEAKS_VERSION} from ${URL}"
-          curl -sSfL --retry 3 -o /tmp/gitleaks.tar.gz "${URL}"
-          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
-          /tmp/gitleaks version
-          echo "Scanning working tree ..."
-          /tmp/gitleaks detect --no-git --redact --exit-code=2 --source .
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   yamllint:
     name: yamllint
