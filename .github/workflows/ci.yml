@@ -41,10 +41,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout repository (shallow: 1 commit only)
+      - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Run gitleaks (working tree only, no git history scan)
+      - name: Run gitleaks (working tree only)
         uses: gitleaks/gitleaks-action@v1
         with:
           args: --no-git --redact
