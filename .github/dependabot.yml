@@ -15,6 +15,15 @@ updates:
     labels:
       - "dependencies"
       - "ci"
+    ignore:
+      # gitleaks-action v3 dropped the `args:` input. Our workflow uses
+      # `args: --no-git --redact` to scan the working tree only; v3 ignores
+      # that flag and forces a `git log -p` history scan that breaks on the
+      # 1-commit branches produced by dependabot. Stay on v2 until we
+      # migrate to a manual `gitleaks detect` bash step (see TODO in
+      # ci.yml and PR #11). Reference date: 2026-07-19.
+      - dependency-name: "gitleaks/gitleaks-action"
+        versions: ["3.x", "4.x"]
     groups:
       minor-and-patch:
         patterns:

@@ -45,7 +45,15 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Run gitleaks (working tree only)
-        uses: gitleaks/gitleaks-action@v1
+        # Pinned to v2 (NOT v3) because v3 dropped the `args` input — v3
+        # ignores our `--no-git` flag and forces a `git log -p` history scan
+        # that breaks on the 1-commit branches produced by dependabot.
+        # v2 still supports `args:` + `--no-git --redact` and is a drop-in.
+        # TODO(migration): GitHub Actions removes Node 20 runtime on
+        # 2026-09-16. Plan a v3 migration: use a manual `gitleaks detect`
+        # bash step (no third-party action), or write FINGERPRINT-format
+        # entries in `.gitleaksignore` to silence historical findings.
+        uses: gitleaks/gitleaks-action@v2
         with:
           args: --no-git --redact
         env:
