@@ -16,7 +16,7 @@ Este repo define la **infraestructura AWS del proyecto**.
 ## Stack
 
 - **Cloud:** AWS (us-east-1, cuenta `681526276858` confirmada para dev)
-- **IaC:** Terraform `>= 1.6.0`, provider `hashicorp/aws ~> 5.40`
+- **IaC:** Terraform `>= 1.6.0`, provider `hashicorp/aws ~> 6.55`
   - Validado en Terraform `1.15.7`. La version exacta que usan los
     workflows se declara en la repo-scoped variable `TF_VERSION`
     (recomendamos bumpear `>= 1.6.0` solo cuando el floor cambie
@@ -104,7 +104,7 @@ El script `docs/SETUP.md` documenta los pasos para `gh secret set`.
 
 ## Convenciones Terraform
 
-- **Provider:** AWS `~> 5.40` (fijo en `live/dev/versions.tf` y
+- **Provider:** AWS `~> 6.55` (fijo en `live/dev/versions.tf` y
   `modules/*/versions.tf`).
 - **Backend:** S3 + native lockfile (`use_lockfile = true`).
 - **Tagging:** `default_tags` a nivel de provider (definido en

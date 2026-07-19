@@ -36,7 +36,7 @@ permissions:
 jobs:
   plan:
     name: Plan (dev)
-    uses: ahincho/spark-match-01-devops/.github/workflows/terraform-plan.yml@c5fd3572ee73f2eafd8b5dac34308fb4f88f842e
+    uses: ahincho/spark-match-01-devops/.github/workflows/terraform-plan.yml@dev
     secrets: inherit
     with:
       environment: dev
