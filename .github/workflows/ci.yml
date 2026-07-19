@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Run gitleaks (working tree only)
-        uses: gitleaks/gitleaks-action@v1
+        uses: gitleaks/gitleaks-action@v3
         with:
           args: --no-git --redact
         env:
