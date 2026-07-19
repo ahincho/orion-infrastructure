@@ -165,9 +165,9 @@ resource "aws_iam_role_policy" "apply" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Sid    = "ApplyFullAccess"
-      Effect = "Allow"
-      Action = "*"
+      Sid      = "ApplyFullAccess"
+      Effect   = "Allow"
+      Action   = "*"
       Resource = "*"
       Condition = {
         StringEquals = {
