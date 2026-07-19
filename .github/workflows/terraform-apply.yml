@@ -35,7 +35,7 @@ permissions:
 jobs:
   apply:
     name: Apply (dev)
-    uses: ahincho/spark-match-01-devops/.github/workflows/terraform-apply.yml@7d8797d7d36c9b61dc31afb7e95e861d10267051
+    uses: ahincho/spark-match-01-devops/.github/workflows/terraform-apply.yml@c5fd3572ee73f2eafd8b5dac34308fb4f88f842e
     secrets: inherit
     with:
       environment: dev
