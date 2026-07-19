@@ -8,9 +8,12 @@
 # El locking se hace con S3 native lockfile (Terraform >= 1.6),
 # por lo que NO se crea tabla DynamoDB.
 #
+# Validado con Terraform 1.15.7 + AWS CLI bajo perfil `orion-admin`.
+# (matching AWS_PROFILE = orion-admin / AKIAZ5LRBWL5ACQKZUPP)
+#
 # Usage:
-#   ./scripts/bootstrap-backend.sh                  # default dev
-#   ENVIRONMENT=dev AWS_REGION=us-east-1 ./scripts/bootstrap-backend.sh
+#   AWS_PROFILE=orion-admin ./scripts/bootstrap-backend.sh            # default dev
+#   AWS_PROFILE=orion-admin ENVIRONMENT=prod ./scripts/bootstrap-backend.sh
 #
 # Si vienes de versiones anteriores que creaban DynamoDB, esa tabla
 # quedara huerfana y deberas limpiarla manualmente:

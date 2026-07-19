@@ -14,6 +14,8 @@
 #   - AWS CLI configurado con un usuario/role con permisos iam:Create*.
 #   - Tener un bucket S3 para state (corre bootstrap-backend.sh antes).
 #
+# Validado con Terraform 1.15.7 + AWS CLI bajo perfil `orion-admin`.
+#
 # Outputs (pegar en docs/SETUP.md):
 #   - orion-terraform-plan-arn
 #   - orion-terraform-apply-arn

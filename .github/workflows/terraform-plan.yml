@@ -4,6 +4,12 @@
 # Caller del reusable en spark-match/spark-match-01-devops@dev.
 # Unico env (dev). Trigger: pull_request contra main + workflow_dispatch.
 #
+# Toda la configuracion se lee del GH Environment "dev":
+#   ENV_NAME, TF_VERSION, AWS_REGION, TF_WORKING_DIR,
+#   TF_BACKEND_BUCKET, TF_BACKEND_KEY, TF_COMMENT_ON_PR
+# Para replicar a otro ambiente (p.ej. production), basta duplicar las
+# variables en su GH Environment y nada se toca en este archivo.
+#
 # Pin @dev: reusables se prueban en dev antes de promover a main.
 # =============================================================================
 
@@ -28,15 +34,15 @@ permissions:
 
 jobs:
   plan:
-    name: Plan (dev)
+    name: Plan (${{ vars.ENV_NAME }})
     uses: spark-match/spark-match-01-devops/.github/workflows/terraform-plan.yml@dev
     secrets: inherit
     with:
-      environment: dev
-      working-directory: live/dev
-      aws-region: us-east-1
+      environment: ${{ vars.ENV_NAME }}
+      working-directory: ${{ vars.TF_WORKING_DIR }}
+      aws-region: ${{ vars.AWS_REGION }}
       plan-role-arn-secret: AWS_PLAN_ROLE_ARN
-      terraform-version: "1.10.0"
-      backend-bucket: orion-tfstate-dev
-      backend-key: dev/terraform.tfstate
-      comment-on-pr: true
+      terraform-version: ${{ vars.TF_VERSION }}
+      backend-bucket: ${{ vars.TF_BACKEND_BUCKET }}
+      backend-key: ${{ vars.TF_BACKEND_KEY }}
+      comment-on-pr: ${{ vars.TF_COMMENT_ON_PR == 'true' }}

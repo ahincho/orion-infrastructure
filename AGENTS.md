@@ -15,8 +15,15 @@ Este repo define la **infraestructura AWS del proyecto**.
 
 ## Stack
 
-- **Cloud:** AWS (us-east-1, cuenta a confirmar por el owner)
+- **Cloud:** AWS (us-east-1, cuenta `681526276858` confirmada para dev)
 - **IaC:** Terraform `>= 1.6.0`, provider `hashicorp/aws ~> 5.40`
+  - Validado en Terraform `1.15.7`. La version exacta que usan los
+    workflows se declara en la GH Environment variable `TF_VERSION`
+    (recomendamos bumpear `>= 1.6.0` solo cuando el floor cambie
+    por una razon mayor; mantener el piso amplio permite correr
+    con versiones futuras sin tocar los `versions.tf`).
+- **AWS CLI local:** perfil `orion-admin` (AdministratorAccess).
+  Alternativo: `spark-match-admin` (mismo nivel, otra cuenta de uso).
 - **Backend:** S3 + native S3 lockfile (sin DynamoDB)
 - **CI/CD:** GitHub Actions, reusable workflows desde
   `spark-match/spark-match-01-devops` (pinneados `@dev`).
@@ -43,11 +50,35 @@ main (protegida, 1 ruleset)
 
 Pendiente de crear (despues del bootstrap):
 
-- **GitHub Secrets (2):**
-  - `AWS_PLAN_ROLE_ARN`
-  - `AWS_APPLY_ROLE_ARN`
+- **GitHub Secrets (2):** valores sensibles. Cifrados en reposo.
+  - `AWS_PLAN_ROLE_ARN` — ARN del IAM role `orion-terraform-plan`
+    (read-only, asumido por GH Actions en PRs contra `main`).
+  - `AWS_APPLY_ROLE_ARN` — ARN del IAM role `orion-terraform-apply`
+    (write, restringido por `aws:RequestedRegion` a `us-east-1`).
 - **GitHub Environment (1):**
-  - `dev` (sin reviewers, auto-approve=true en caller)
+  - `dev` — branch policy = `main`, sin reviewers, auto-approve=true.
+
+### Variables del GH Environment `dev`
+
+Toda la config que antes estaba quemada en los workflows ahora vive
+en variables del environment `dev`. Para replicar a otro ambiente
+(p.ej. `production`) basta duplicar las variables; los workflows
+no se tocan.
+
+| Variable | Valor dev | Proposito |
+|---|---|---|
+| `ENV_NAME` | `dev` | nombre logico del ambiente |
+| `TF_VERSION` | `1.15.7` | version Terraform usada por los jobs |
+| `AWS_REGION` | `us-east-1` | region AWS por defecto |
+| `TF_WORKING_DIR` | `live/dev` | directorio donde corre `terraform` |
+| `TF_BACKEND_BUCKET` | `orion-tfstate-dev` | bucket S3 del state |
+| `TF_BACKEND_KEY` | `dev/terraform.tfstate` | ruta interna del state |
+| `TF_COMMENT_ON_PR` | `true` | plan postea comentario en PR |
+| `TF_AUTO_APPROVE` | `true` | apply no pide reviewer (dev only) |
+
+Los nombres de los Secrets (`AWS_PLAN_ROLE_ARN`, `AWS_APPLY_ROLE_ARN`)
+quedan literales en los `with:` porque apuntan a la entrada del secret,
+no a su valor.
 
 El script `scripts/setup-oidc.sh` crea los IAM roles en AWS.
 El script `docs/SETUP.md` documenta los pasos para `gh secret set`.
@@ -83,9 +114,14 @@ Si mas adelante se quiere producir a production:
 1. Renombrar `live/dev/` a `live/<env_name>/` (estructura existente).
 2. Agregar un segundo remote module instance (e.g. `module.oidc_github_prod`)
    con OIDC para production.
-3. Duplicar `terraform-plan.yml` con otro `environment:` y
-   `backend-bucket:`.
-4. Crear GitHub Environment `production` con reviewer.
+3. Crear GitHub Environment `production` y duplicar las 8 variables
+   de la tabla anterior (`ENV_NAME=production`, `TF_WORKING_DIR=live/prod`,
+   `TF_BACKEND_BUCKET=orion-tfstate-prod`, `TF_BACKEND_KEY=prod/terraform.tfstate`,
+   `TF_AUTO_APPROVE=false`, etc.). Los workflows no necesitan cambios.
+4. Anadir reviewer humano al environment `production`.
+5. Crear Secrets `AWS_PLAN_ROLE_ARN_PROD` y `AWS_APPLY_ROLE_ARN_PROD`
+   (nombres distintos para evitar confusion) y ajustar workflows
+   si los nombres divergen entre envs.
 
 Por ahora NO se hace.
 

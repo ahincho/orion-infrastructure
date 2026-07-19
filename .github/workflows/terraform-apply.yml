@@ -4,6 +4,12 @@
 # Caller del reusable en spark-match/spark-match-01-devops@dev.
 # Trigger: push a main (auto-deploy a dev env).
 #
+# Toda la configuracion se lee del GH Environment "dev":
+#   ENV_NAME, TF_VERSION, AWS_REGION, TF_WORKING_DIR,
+#   TF_BACKEND_BUCKET, TF_BACKEND_KEY, TF_AUTO_APPROVE
+# TF_AUTO_APPROVE=true porque el environment "dev" no tiene reviewers
+# (solo-dev). Para production, duplicar variables y set TF_AUTO_APPROVE=false.
+#
 # GH Environment "dev" sin reviewers, auto-approve (administrador puede
 # mandar apply sin aprobacion manual).
 # =============================================================================
@@ -27,16 +33,16 @@ permissions:
 
 jobs:
   apply:
-    name: Apply (dev)
+    name: Apply (${{ vars.ENV_NAME }})
     uses: spark-match/spark-match-01-devops/.github/workflows/terraform-apply.yml@dev
     secrets: inherit
     with:
-      environment: dev
-      gh-environment: dev
-      working-directory: live/dev
-      aws-region: us-east-1
+      environment: ${{ vars.ENV_NAME }}
+      gh-environment: ${{ vars.ENV_NAME }}
+      working-directory: ${{ vars.TF_WORKING_DIR }}
+      aws-region: ${{ vars.AWS_REGION }}
       apply-role-arn-secret: AWS_APPLY_ROLE_ARN
-      terraform-version: "1.10.0"
-      backend-bucket: orion-tfstate-dev
-      backend-key: dev/terraform.tfstate
-      auto-approve: true
+      terraform-version: ${{ vars.TF_VERSION }}
+      backend-bucket: ${{ vars.TF_BACKEND_BUCKET }}
+      backend-key: ${{ vars.TF_BACKEND_KEY }}
+      auto-approve: ${{ vars.TF_AUTO_APPROVE == 'true' }}
