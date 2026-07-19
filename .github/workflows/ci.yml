@@ -97,3 +97,69 @@ jobs:
 
       - name: Run tflint
         run: tflint --recursive
+
+  terraform-fmt:
+    name: terraform fmt
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ vars.TF_VERSION }}
+
+      - name: Run terraform fmt -check
+        run: terraform fmt -check -recursive -diff
+
+  terraform-validate:
+    name: terraform validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ vars.TF_VERSION }}
+
+      # init -backend=false por directorio: descarga providers sin tocar el
+      # backend S3 (no requiere creds AWS). Valida live/dev + los 2 modulos.
+      - name: terraform init -backend=false (por modulo)
+        run: |
+          set -euo pipefail
+          for d in live/dev modules/storage-tfstate modules/oidc-github; do
+            echo "::group::init $d"
+            terraform -chdir="$d" init -backend=false -upgrade=false
+            echo "::endgroup::"
+          done
+
+      - name: terraform validate (por modulo)
+        run: |
+          set -euo pipefail
+          for d in live/dev modules/storage-tfstate modules/oidc-github; do
+            echo "::group::validate $d"
+            terraform -chdir="$d" validate
+            echo "::endgroup::"
+          done
+
+  checkov:
+    name: checkov
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install checkov
+        run: pip install --quiet checkov==3.2.415
+
+      # --soft-fail durante onboarding: reporta findings en el log sin romper
+      # CI. Una vez revisados los hallazgos, pasar a hard fail con skip-check
+      # justificados en .checkov.yml (ver follow-up issue).
+      - name: Run checkov (soft-fail onboarding)
+        run: checkov --directory . --framework terraform --compact --soft-fail
