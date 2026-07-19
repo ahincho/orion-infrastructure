@@ -26,7 +26,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Download actionlint binary
         id: get_actionlint
@@ -54,7 +54,7 @@ jobs:
       # the whole history because each PR contains at most its own
       # commit's worth of new code.
       - name: Checkout repository (full history for gitleaks v3)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -69,7 +69,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install yamllint
         run: pip install --quiet yamllint==1.35.1
@@ -83,7 +83,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
