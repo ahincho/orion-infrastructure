@@ -35,6 +35,7 @@ permissions:
 jobs:
   plan:
     name: Plan (${{ vars.ENV_NAME }})
+    environment: ${{ vars.ENV_NAME }}
     uses: spark-match/spark-match-01-devops/.github/workflows/terraform-plan.yml@dev
     secrets: inherit
     with:
