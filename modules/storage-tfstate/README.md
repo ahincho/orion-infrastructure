@@ -1,8 +1,15 @@
 # Module: storage-tfstate
 
-Crea el bucket S3 para almacenar el state de Terraform con versionado, AES256 y bloqueo de acceso publico.
+Crea el bucket S3 para state remoto de Terraform con:
+
+- Versionado habilitado (obligatorio para state + lockfile)
+- Encriptacion server-side AES256 (FIPS 140-2 compliant)
+- Acceso publico bloqueado (4 flags)
 
 ## Uso
+
+Una invocacion por ambiente (este repo solo soporta `environment=dev`,
+pero el modulo es reutilizable).
 
 ```hcl
 module "storage_tfstate" {
@@ -14,28 +21,16 @@ module "storage_tfstate" {
 }
 ```
 
-## Bootstrap manual
+Resultado: bucket `orion-tfstate-dev` con la configuracion arriba descrita.
 
-Antes del primer apply, crear el bucket fuera de Terraform:
+## Primera vez
 
-```bash
-ENVIRONMENT=dev ./scripts/bootstrap-backend.sh
-```
+El bucket NO se puede crear dentro de Terraform (chicken-and-egg). La primera
+vez se crea via `scripts/bootstrap-backend.sh` antes del primer
+`terraform init`. Las invocaciones siguientes del modulo son idempotentes.
 
-El script es idempotente. Si el bucket ya existe (porque fue creado por un apply previo), no hace nada.
+## Lifecycle (opcional)
 
-## Outputs
-
-| Output | Descripcion |
-|---|---|
-| `bucket_id` | Nombre del bucket (ej. `orion-tfstate-dev`). |
-| `bucket_arn` | ARN del bucket. |
-| `bucket_region` | Region AWS donde vive. |
-| `bucket_domain_name` | Domain name para endpoints S3. |
-
-## Decisiones
-
-- **AES256 server-side** (FIPS 140-2 compliant). No se migra a SSE-KMS por chicken-and-egg entre CMK y bucket.
-- **Versioning enabled** (obligatorio para `terraform plan` post-recovery).
-- **Locking**: `use_lockfile = true` en `versions.tf` (Terraform >= 1.6). NO se crea tabla DynamoDB.
-- **Public access block** con 4 flags.
+Variables `lifecycle_transition_to_ia_days` y
+`lifecycle_transition_to_glacier_days` permiten transicionar objetos a clases
+mas baratas. Por defecto deshabilitados (0 = disabled).

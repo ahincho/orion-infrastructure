@@ -15,22 +15,24 @@ variable "project_name" {
   }
 }
 
+# Single env (dev). Si en futuro se necesita un segundo env, ver
+# AGENTS.md (seccion "Agregar un segundo AWS environment").
 variable "environment" {
-  description = "Nombre del entorno. Determina nombres de recursos, OIDC trust policies y tagging."
+  description = "Nombre del entorno AWS. Unico valor soportado: dev."
   type        = string
   default     = "dev"
 
   validation {
-    condition     = contains(["dev", "staging", "prod"], var.environment)
-    error_message = "environment debe ser uno de: dev, staging, prod."
+    condition     = var.environment == "dev"
+    error_message = "environment debe ser exactamente 'dev' (este repo solo soporta dev)."
   }
 }
 
-# Repositorio GitHub del caller, usado para trust policy de los IAM roles OIDC.
+# Repositorio GitHub del caller, usado para trust policy OIDC.
 variable "github_repository" {
   description = "Repositorio GitHub que puede asumir los roles OIDC de Terraform (formato owner/repo)."
   type        = string
-  default     = "ahincho/orion-infrastructure-devops"
+  default     = "ahincho/orion-infrastructure"
 
   validation {
     condition     = can(regex("^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$", var.github_repository))
@@ -43,6 +45,6 @@ locals {
     Project     = var.project_name
     Environment = var.environment
     ManagedBy   = "terraform"
-    Repository  = "ahincho/orion-infrastructure-devops"
+    Repository  = "ahincho/orion-infrastructure"
   }
 }

@@ -2,15 +2,15 @@ name: CI - Lint & Security
 
 on:
   pull_request:
-    branches: [main, dev]
+    branches: [main]
     types: [opened, synchronize, reopened]
     paths:
-      - '.github/**'
-      - '**.yml'
-      - '**.yaml'
-      - '**.md'
-      - '**.tf'
-      - '**.sh'
+      - ".github/**"
+      - "**.yml"
+      - "**.yaml"
+      - "**.md"
+      - "**.tf"
+      - "**.sh"
 
 permissions:
   contents: read
@@ -76,7 +76,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
         with:
-          terraform_version: '1.10.0'
+          terraform_version: "1.10.0"
 
       - name: Setup TFLint
         uses: terraform-linters/setup-tflint@v4

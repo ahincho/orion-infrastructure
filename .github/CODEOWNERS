@@ -1,8 +1,5 @@
-# CODEOWNERS - ORION Infrastructure DevOps
+# CODEOWNERS - ORION Infrastructure
 # Solo-dev project: una sola persona aprueba.
-# Si en el futuro se suman mas code owners, agregar explicitamente
-# path-by-path (NO usar catch-all * porque GitHub acumula code owners
-# de TODAS las reglas que matchean un path).
 
 # Documentos de governance.
 /README.md                                  @ahincho
@@ -21,9 +18,8 @@
 /.yamllint.yml                              @ahincho
 /.gitignore                                  @ahincho
 
-# Terraform - root modules por ambiente.
+# Terraform - root module unico (dev).
 /live/dev/                                   @ahincho
-/live/prod/                                  @ahincho
 
 # Terraform - modulos reusables.
 /modules/storage-tfstate/                    @ahincho

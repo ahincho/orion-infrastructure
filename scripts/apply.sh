@@ -3,15 +3,15 @@
 # apply.sh - terraform apply desde el tfplan generado por plan.sh
 # ============================================================================
 # Uso:
-#   ./scripts/apply.sh dev        # aplica el plan previo
-#   ./scripts/apply.sh prod       # aplica el plan previo
+#   ./scripts/apply.sh          # aplica el plan previo (default dev)
+#   ./scripts/apply.sh dev      # explicito
 #
 # Requiere:
-#   - Haber corrido plan.sh (existe tfplan en live/$ENV/)
+#   - Haber corrido plan.sh (existe tfplan en live/dev/)
 # ============================================================================
 set -euo pipefail
 
-ENV="${1:-prod}"
+ENV="${1:-dev}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 LIVE_DIR="${PROJECT_DIR}/live/${ENV}"

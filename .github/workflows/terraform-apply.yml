@@ -1,28 +1,20 @@
 # =============================================================================
 # CD - Terraform Apply
 # =============================================================================
-# Caller del reusable en spark-match/spark-match-01-devops.
-# Por env (dev + prod) crea un job separado.
-# Reusa el patron de spark-match-02-infrastructure/terraform-apply.yml.
+# Caller del reusable en spark-match/spark-match-01-devops@dev.
+# Trigger: push a main (auto-deploy a dev env).
 #
-# Pin: dev caller -> @dev, prod caller -> @main.
+# GH Environment "dev" sin reviewers, auto-approve (administrador puede
+# mandar apply sin aprobacion manual).
 # =============================================================================
 
 name: CD - Terraform Apply
 
 on:
   push:
-    branches: [dev, main]
+    branches: [main]
   workflow_dispatch:
     inputs:
-      environment:
-        description: "Target environment (dev | prod)"
-        type: choice
-        required: true
-        default: "dev"
-        options:
-          - dev
-          - prod
       reason:
         description: "Reason for manual apply"
         required: false
@@ -34,11 +26,8 @@ permissions:
   id-token: write
 
 jobs:
-  apply-dev:
+  apply:
     name: Apply (dev)
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/dev')
-      || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev')
     uses: spark-match/spark-match-01-devops/.github/workflows/terraform-apply.yml@dev
     secrets: inherit
     with:
@@ -46,26 +35,8 @@ jobs:
       gh-environment: dev
       working-directory: live/dev
       aws-region: us-east-1
-      apply-role-arn-secret: AWS_APPLY_ROLE_ARN_DEV
-      terraform-version: '1.10.0'
+      apply-role-arn-secret: AWS_APPLY_ROLE_ARN
+      terraform-version: "1.10.0"
       backend-bucket: orion-tfstate-dev
       backend-key: dev/terraform.tfstate
       auto-approve: true
-
-  apply-prod:
-    name: Apply (prod)
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
-      || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
-    uses: spark-match/spark-match-01-devops/.github/workflows/terraform-apply.yml@main
-    secrets: inherit
-    with:
-      environment: prod
-      gh-environment: production
-      working-directory: live/prod
-      aws-region: us-east-1
-      apply-role-arn-secret: AWS_APPLY_ROLE_ARN_PROD
-      terraform-version: '1.10.0'
-      backend-bucket: orion-tfstate-prod
-      backend-key: prod/terraform.tfstate
-      auto-approve: false

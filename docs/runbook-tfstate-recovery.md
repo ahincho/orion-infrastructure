@@ -1,9 +1,9 @@
 # Runbook - Recuperacion del state bucket
 
-Los buckets `orion-tfstate-dev` y `orion-tfstate-prod` son el source of truth de
-la infraestructura. **Si se pierden, se pierde toda la historia de los recursos
-creados por Terraform** y se vuelve imposible hacer `terraform plan`/`apply`
-sin recrear manualmente todo.
+El bucket `orion-tfstate-dev` es el source of truth de la infraestructura.
+**Si se pierde, se pierde toda la historia de los recursos creados por
+Terraform** y se vuelve imposible hacer `terraform plan`/`apply` sin recrear
+manualmente todo.
 
 Este runbook cubre los escenarios mas comunes.
 
@@ -11,7 +11,7 @@ Este runbook cubre los escenarios mas comunes.
 
 ## Escenario 1: state se corrompe (apply deja state inconsistente)
 
-**Sintoma**: `terraform plan` muestra deltas inesperados, o `terraform apply`
+**Sintoma:** `terraform plan` muestra deltas inesperados, o `terraform apply`
 falla con "Error: state snapshot was created from a different state file".
 
 **Recuperacion** (gracias a versioning del bucket):
@@ -21,10 +21,10 @@ falla con "Error: state snapshot was created from a different state file".
 aws s3api list-object-versions \
   --bucket orion-tfstate-dev \
   --prefix dev/terraform.tfstate \
-  --query 'Versions[].{VersionId:VersionId,LastModified:LastModified}' \
+  --query '"'"'Versions[].{VersionId:VersionId,LastModified:LastModified}'"'"' \
   --output table
 
-# 2. Identificar la version "buena" (la ultima que se sabe que funciono).
+# 2. Identificar la version "buena".
 #    Tip: comparar timestamps con el ultimo apply exitoso en GitHub Actions
 #    (gh run list --workflow=terraform-apply.yml --status=success)
 
@@ -46,9 +46,9 @@ cd live/dev && terraform plan
 
 ## Escenario 2: state se borra accidentalmente (el bucket sigue existiendo)
 
-**Sintoma**: `terraform init` muestra "Error: Failed to read state file... NoSuchKey".
+**Sintoma:** `terraform init` muestra "Error: Failed to read state file... NoSuchKey".
 
-**Recuperacion**:
+**Recuperacion:**
 
 ```bash
 # 1. Listar versiones borradas (soft-delete en S3 versioning)
@@ -64,73 +64,58 @@ aws s3api delete-object \
 
 # 3. Si el state se borro completamente, no hay nada que recuperar.
 #    Solucion: hacer `terraform import` de cada recurso o recrear todo.
-#    Esto es lo que evita el runbook de "Escenario 3".
 ```
 
 ---
 
 ## Escenario 3: el bucket completo se borra (worst case)
 
-**Sintoma**: el bucket `orion-tfstate-{env}` no existe. `terraform init`
+**Sintoma:** el bucket `orion-tfstate-dev` no existe. `terraform init`
 muestra "Error: Failed to get S3 bucket".
 
-**Prevencion**: en este escenario NO HAY recovery posible desde S3 (aunque el
-bucket tuviera versioning, los objetos estan en el bucket). Las unicas
+**Prevencion:** en este escenario NO HAY recovery posible desde S3. Las
 defensas son:
 
-1. **Snapshots cross-region** (recomendado para prod): configurar CRR
-   (Cross-Region Replication) del bucket `orion-tfstate-prod` a un bucket en
-   otra region.
-
-2. **Backup offline** (alternativa barata): descargar el state periodicamente:
+1. **Snapshots cross-region** (recomendado): configurar CRR
+   (Cross-Region Replication) del bucket a otro bucket en otra region.
+2. **Backup offline:**
 
    ```bash
-   aws s3 cp s3://orion-tfstate-prod/prod/terraform.tfstate \
-     ./backups/tfstate-prod-$(date +%Y%m%d).tfstate
+   aws s3 cp s3://orion-tfstate-dev/dev/terraform.tfstate \
+     ./backups/tfstate-dev-$(date +%Y%m%d).tfstate
    ```
-
-   Guardar en un lugar seguro (otro bucket S3, repositorio privado, maquina
-   del operador).
 
 3. **Re-bootstrap + terraform import** (si no hay backup):
 
    ```bash
-   # 1. Re-crear el bucket
-   ENVIRONMENT=prod ./scripts/bootstrap-backend.sh
-
-   # 2. terraform init con backend vacio
-   cd live/prod
-   terraform init
-
-   # 3. terraform import cada recurso (muy laborioso, mejor evitar llegar aca).
-   #    Ejemplo para un bucket:
-   #    terraform import module.storage_tfstate.aws_s3_bucket.tfstate orion-tfstate-prod
+   ./scripts/bootstrap-backend.sh
+   cd live/dev
+   terraform init   # con backend vacio
+   # terraform import <resource.address> <id>  por cada recurso
    ```
 
 ---
 
 ## Escenario 4: state existe pero apunta a recursos que no existen en AWS (drift severo)
 
-**Sintoma**: `terraform plan` muestra que va a recrear muchos recursos.
+**Sintoma:** `terraform plan` muestra que va a recrear muchos recursos.
 
-**Diagnostico**:
+**Diagnostico:**
 
 ```bash
-# Comparar state con AWS real
-cd live/prod
+cd live/dev
 terraform plan -detailed-exitcode
 # exit 0 = sin cambios
 # exit 1 = error
 # exit 2 = hay cambios (drift detectado)
 
-# Listar recursos administrados por este state
 terraform state list
 ```
 
-**Opciones**:
+**Opciones:**
 
 - Si los recursos fueron borrados a mano y queres recuperarlos:
-  `terraform apply` (Terraform los recrea).
+  `terraform apply` (los recrea).
 - Si los recursos fueron movidos: `terraform state mv` o
   `terraform state rm` + `terraform import`.
 
@@ -148,7 +133,7 @@ Despues de cualquier incidente con el state:
 
 ---
 
-## Monitoreo del bucket (recomendado para prod)
+## Monitoreo del bucket (recomendado)
 
 Configurar CloudWatch alarm o GitHub Action periodico (cron semanal) que
 verifique:
@@ -158,18 +143,3 @@ verifique:
 - El size del state es razonable (<1MB para nuestro caso)
 - Versioning sigue habilitado
 - KMS encryption sigue activo
-
-Workflow ejemplo (futuro):
-
-```yaml
-name: Weekly state bucket health check
-on:
-  schedule:
-    - cron: '0 8 * * MON'
-jobs:
-  check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - run: ./scripts/check-state-bucket.sh prod
-```

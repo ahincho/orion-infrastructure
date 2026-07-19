@@ -9,7 +9,7 @@ variable "project_name" {
 }
 
 variable "aws_region" {
-  description = "Region AWS. Se usa solo para naming (los IAM roles son globales)."
+  description = "Region AWS. Usada para restringir permisos del apply role (RequestedRegion)."
   type        = string
   default     = "us-east-1"
 }
@@ -25,7 +25,7 @@ variable "github_repository" {
 }
 
 variable "oidc_provider_thumbprint" {
-  description = "Thumbprint del certificado del OIDC provider de GitHub Actions. Estable desde 2023 (6938fd4d98bab03faadb97b34396831e3780aea1)."
+  description = "Thumbprint del certificado del OIDC provider de GitHub Actions (estable desde 2023)."
   type        = string
   default     = "6938fd4d98bab03faadb97b34396831e3780aea1"
 }
