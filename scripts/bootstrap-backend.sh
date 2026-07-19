@@ -9,7 +9,8 @@
 # por lo que NO se crea tabla DynamoDB.
 #
 # Validado con Terraform 1.15.7 + AWS CLI bajo perfil `orion-admin`.
-# (matching AWS_PROFILE = orion-admin / AKIAZ5LRBWL5ACQKZUPP)
+# (usa `aws configure get aws_access_key_id --profile orion-admin` para
+#  ver el Key ID actual bajo esa perfil; nunca hardcodear el AKIA aqui.)
 #
 # Usage:
 #   AWS_PROFILE=orion-admin ./scripts/bootstrap-backend.sh            # default dev
