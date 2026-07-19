@@ -158,8 +158,8 @@ jobs:
       - name: Install checkov
         run: pip install --quiet checkov==3.2.415
 
-      # --soft-fail durante onboarding: reporta findings en el log sin romper
-      # CI. Una vez revisados los hallazgos, pasar a hard fail con skip-check
-      # justificados en .checkov.yml (ver follow-up issue).
-      - name: Run checkov (soft-fail onboarding)
-        run: checkov --directory . --framework terraform --compact --soft-fail
+      # Hard fail: los hallazgos justificados se skippean inline en los .tf
+      # via `# checkov:skip=CKV_AWS_XX:reason`. Si checkov falla, revisar el
+      # nuevo finding y agregar skip con justificacion o fixear el recurso.
+      - name: Run checkov
+        run: checkov --directory . --framework terraform --compact
