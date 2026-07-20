@@ -21,6 +21,9 @@
 #                                  (orion-dev-rds + orion_admin + orion DB)
 #   8. modules/ssm-bootstrap       SSM params para wiring cross-ORION
 #                                  (refs al bus + secret + CORS whitelist)
+#   9. modules/iam-sam-deploy-dev  IAM role + SamDeployPolicy para el
+#                                  workflow `CD - Deploy` de orion-backend
+#                                  (Phase 1.5 - bootstrap Terraform-managed)
 ###############################################################################
 
 ###############################################################################
@@ -214,6 +217,36 @@ module "ssm_bootstrap" {
   lambda_subnet_ids        = module.network.private_subnet_ids
   lambda_security_group_id = module.iam_lambda_exec.lambda_security_group_id
   lambda_role_arn          = module.iam_lambda_exec.role_arn
+
+  tags = local.common_tags
+}
+
+###############################################################################
+# Phase 1.5: SAM deploy role (orion-backend CD pipeline)
+# -----------------------------------------------------------------------------
+# Reemplaza el bootstrap manual previo (scripts/create-sam-deploy-role.sh).
+# El role es asumido por el workflow `CD - Deploy` de orion-backend via
+# GitHub OIDC (audience=sts.amazonaws.com, sub restringido a
+# repo:ahincho/orion-backend:ref:refs/heads/main*environment:dev).
+#
+# Outputs:
+#   - module.iam_sam_deploy_dev.role_arn -> set as AWS_DEPLOY_ROLE_ARN
+#     en el GH Environment `dev` de orion-backend.
+###############################################################################
+module "iam_sam_deploy_dev" {
+  source = "../../modules/iam-sam-deploy-dev"
+
+  project_name = var.project_name
+  environment  = var.environment
+  aws_region   = var.aws_region
+  account_id   = local.account_id
+
+  github_org          = "ahincho"
+  github_repo         = "orion-backend"
+  github_branch       = "refs/heads/main"
+  github_environments = ["dev"]
+
+  s3_artifacts_bucket = "orion-sam-artifacts-dev"
 
   tags = local.common_tags
 }

@@ -183,3 +183,16 @@ output "ssm_cors_origins_value" {
   value       = module.ssm_bootstrap.cors_allowed_origins_value
   sensitive   = true
 }
+
+###############################################################################
+# Phase 1.5 outputs: SAM deploy role (orion-backend CD pipeline)
+###############################################################################
+output "sam_deploy_role_arn" {
+  description = "ARN del IAM role orion-sam-deploy-dev. Set as AWS_DEPLOY_ROLE_ARN en el GH Environment `dev` de orion-backend."
+  value       = module.iam_sam_deploy_dev.role_arn
+}
+
+output "sam_deploy_role_name" {
+  description = "Nombre del IAM role sam deploy (orion-sam-deploy-dev)."
+  value       = module.iam_sam_deploy_dev.role_name
+}
