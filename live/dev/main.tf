@@ -76,13 +76,13 @@ module "network" {
   project_name = var.project_name
   environment  = var.environment
 
-  single_nat_gateway = true  # dev cost-saving (~32 USD/mes)
+  single_nat_gateway = true # dev cost-saving (~32 USD/mes)
 
   # VPC endpoints interfaz cuestan ~$87/mes (6 endpoints x $0.01/h x 2 AZs).
   # Para free-tier, las Lambdas hablan a AWS APIs via NAT Gateway con
   # latencia ligeramente mayor pero zero-cost. Activar cuando se migre
   # a prod o cuando se quiera single-digit-ms latency to SM/SSM/ECR.
-  enable_vpc_endpoints  = false
+  enable_vpc_endpoints    = false
   flow_log_retention_days = 30
 
   tags = local.common_tags
@@ -96,7 +96,7 @@ module "secrets_bootstrap" {
 
   project_name            = var.project_name
   environment             = var.environment
-  recovery_window_in_days = 0  # dev: delete OK sin espera
+  recovery_window_in_days = 0 # dev: delete OK sin espera
 
   tags = local.common_tags
 }
@@ -124,7 +124,7 @@ module "iam_lambda_exec" {
   project_name = var.project_name
   environment  = var.environment
 
-  vpc_id  = module.network.vpc_id
+  vpc_id   = module.network.vpc_id
   vpc_cidr = module.network.vpc_cidr
 
   # No secret_arns list: usa tag condition Project=orion en su lugar
@@ -155,10 +155,10 @@ module "rds_postgres" {
   project_name = var.project_name
   environment  = var.environment
 
-  engine_version  = "16.4"
-  instance_class  = "db.t4g.micro"   # free-tier eligible, ARM Graviton
-  allocated_storage = 20               # free-tier max
-  storage_type    = "gp3"
+  engine_version    = "16.4"
+  instance_class    = "db.t4g.micro" # free-tier eligible, ARM Graviton
+  allocated_storage = 20             # free-tier max
+  storage_type      = "gp3"
 
   # Network (de network module):
   vpc_id        = module.network.vpc_id
@@ -202,7 +202,7 @@ module "ssm_bootstrap" {
   # CORS whitelist (default permite localhost:3000 + orion.dev).
   cors_allowed_origins = [
     "http://localhost:3000",
-    "http://localhost:5173",  # Vite dev server
+    "http://localhost:5173", # Vite dev server
     "https://orion.dev",
   ]
 
