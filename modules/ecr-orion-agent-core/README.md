@@ -1,15 +1,15 @@
-# modules/ecr-orion-agent
+# modules/ecr-orion-agent-core
 
-ECR repository privado para las imagenes del OrionAgent deployadas en
+ECR repository privado para las imagenes de `OrionAgentCore` deployadas en
 Bedrock AgentCore.
 
 ## Recursos que crea
 
 | Recurso | Nombre | Proposito |
 |---|---|---|
-| `aws_ecr_repository` | `<project_name>-agent-<env>` | Repo privado AES256 + scan_on_push |
+| `aws_ecr_repository` | `<project_name>-agent-core-<env>` | Repo privado AES256 + scan_on_push |
 | `aws_ecr_lifecycle_policy` | (idem) | Retiene max N imagenes; expira el resto |
-| `aws_ecr_repository_policy` | (idem) | Otorga pull a principals ARN-listados |
+| `aws_ecr_repository_policy` | (idem) | Otorga pull a principals ARN-listados (param `principal_arns_with_pull`, default vacio) |
 
 ## Inputs
 
@@ -30,10 +30,17 @@ Bedrock AgentCore.
 
 | Nombre | Descripcion |
 |---|---|
-| `repository_id` | ID interno del repo. |
-| `repository_arn` | ARN completo (e.g. `arn:aws:ecr:us-east-1:681526276858:repository/orion-agent-dev`). Wire a `var.ecr_repository_arn` del modulo `iam-orion-agent-dev`. |
+| `repository_id` | ID interno del repo (registry ID, sin la URL). |
+| `repository_arn` | ARN completo (e.g. `arn:aws:ecr:us-east-1:681526276858:repository/orion-agent-core-dev`). Wire a `var.ecr_repository_arn` del modulo `iam-orion-agent-core-deploy`. |
 | `repository_name` | Nombre corto. |
-| `repository_url` | Registry URL completa (e.g. `681526276858.dkr.ecr.us-east-1.amazonaws.com/orion-agent-dev`). Usar en comandos `docker push`. |
+| `repository_url` | Registry URL completa (e.g. `681526276858.dkr.ecr.us-east-1.amazonaws.com/orion-agent-core-dev`). Usar en comandos `docker push` y como input para `aws_bedrockagentcore_agent_runtime.agent_runtime_artifact.container_configuration.uri`. |
+
+## Tags aplicados
+
+- `Name = "<project>-agent-core-<env>"` (sobrescribible via `var.tags`)
+- `Purpose = "OrionAgentCoreECR"`
+- `Component = "registry"`
+- Tags default del provider (`Project`, `Environment`, `ManagedBy`, `Repository`).
 
 ## Skip de Checkov
 

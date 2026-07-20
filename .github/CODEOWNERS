@@ -24,8 +24,8 @@
 # Terraform - modulos reusables.
 /modules/storage-tfstate/                    @ahincho
 /modules/oidc-github/                        @ahincho
-/modules/iam-orion-agent-dev/                @ahincho
-/modules/ecr-orion-agent/                    @ahincho
+/modules/iam-orion-agent-core-deploy/        @ahincho
+/modules/ecr-orion-agent-core/               @ahincho
 
 # Documentacion tecnica.
 /docs/                                       @ahincho

@@ -219,17 +219,23 @@ module "ssm_bootstrap" {
 }
 
 ###############################################################################
-# Phase 1.6: Orion Agent infra (Bedrock AgentCore Runtime deployment)
+# Phase 1.6: OrionAgentCore infra (Bedrock AgentCore Runtime deployment)
 # -----------------------------------------------------------------------------
-# - module.ecr_orion_agent: ECR repository privado para imagenes del agent.
-# - module.iam_orion_agent_dev: GitHub OIDC role asumido por orion-cognitive-agent
-#   para deploys del agent (ECR pull + Bedrock AgentCore control/data plane).
-# - aws_ecr_repository_policy.orion_agent: otorga pull al deploy role.
+# - module.ecr_orion_agent_core: ECR repository privado para imagenes del agent.
+# - module.iam_orion_agent_core_deploy: GitHub OIDC role asumido por
+#   orion-cognitive-agent para deploys del agent (ECR pull + Bedrock AgentCore
+#   control/data plane + Bedrock InvokeModel + CloudWatch logs + SSM read +
+#   iam:PassRole hacia bedrock-agentcore.amazonaws.com).
+# - aws_ecr_repository_policy.orion_agent_core: otorga pull al deploy role.
 #   Definido en live/dev (no en el modulo) para evitar cycle entre los 2 modulos.
+# - (futuro) module.iam_orion_agent_core_runtime: role asumido por el
+#   contenedor dentro del AgentCore Runtime (PR #44).
+# - (futuro) module.bedrock_agent_core_runtime: aws_bedrockagentcore_agent_runtime
+#   + aws_bedrockagentcore_agent_runtime_endpoint (PR #45).
 ###############################################################################
 
-module "ecr_orion_agent" {
-  source = "../../modules/ecr-orion-agent"
+module "ecr_orion_agent_core" {
+  source = "../../modules/ecr-orion-agent-core"
 
   project_name = var.project_name
   environment  = var.environment
@@ -243,8 +249,8 @@ module "ecr_orion_agent" {
   tags = local.common_tags
 }
 
-module "iam_orion_agent_dev" {
-  source = "../../modules/iam-orion-agent-dev"
+module "iam_orion_agent_core_deploy" {
+  source = "../../modules/iam-orion-agent-core-deploy"
 
   project_name = var.project_name
   environment  = var.environment
@@ -252,25 +258,25 @@ module "iam_orion_agent_dev" {
   github_repository = "ahincho/orion-cognitive-agent"
 
   oidc_provider_arn  = module.oidc_github.oidc_provider_arn
-  ecr_repository_arn = module.ecr_orion_agent.repository_arn
+  ecr_repository_arn = module.ecr_orion_agent_core.repository_arn
 
   tags = local.common_tags
 }
 
 # Cross-cycle resourceless wire: el deploy role necesita pull del ECR repo.
-# Se rompe el ciclo iam_orion_agent_dev <-> ecr_orion_agent declarando el
-# aws_ecr_repository_policy directamente en live/dev (fuera de cualquier modulo).
-resource "aws_ecr_repository_policy" "orion_agent" {
-  repository = module.ecr_orion_agent.repository_name
+# Se rompe el ciclo iam <-> ecr declarando el aws_ecr_repository_policy
+# directamente en live/dev (fuera de cualquier modulo).
+resource "aws_ecr_repository_policy" "orion_agent_core" {
+  repository = module.ecr_orion_agent_core.repository_name
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "AllowPullForOrionAgentDeployRole"
+        Sid    = "AllowPullForOrionAgentCoreDeployRole"
         Effect = "Allow"
         Principal = {
-          AWS = module.iam_orion_agent_dev.deploy_role_arn
+          AWS = module.iam_orion_agent_core_deploy.deploy_role_arn
         }
         Action = [
           "ecr:GetDownloadUrlForLayer",

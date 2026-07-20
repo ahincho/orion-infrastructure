@@ -161,14 +161,16 @@ Modulos en `modules/` que provisionan recursos consumidos por
 
 | Modulo | Recursos | Consumido por |
 |---|---|---|
-| `modules/ecr-orion-agent` | ECR repo privado (`<project>-agent-<env>`) AES256 + scan_on_push + lifecycle policy | Deploy job + AgentCore Runtime execution role (pull imagen) |
-| `modules/iam-orion-agent-dev` | GitHub OIDC role (`<project>-agent-deploy-<env>`) con permisos granulares sobre AgentCore + Bedrock + ECR | Repo `ahincho/orion-cognitive-agent` (workflows en main branch) |
+| `modules/ecr-orion-agent-core` | ECR repo privado (`<project>-agent-core-<env>`) AES256 + scan_on_push + lifecycle policy | Deploy job + AgentCore Runtime execution role (pull imagen) |
+| `modules/iam-orion-agent-core-deploy` | GitHub OIDC role (`<project>-agent-core-deploy-<env>`) con permisos granulares sobre AgentCore + Bedrock + ECR | Repo `ahincho/orion-cognitive-agent` (workflows en main branch) |
+| `modules/iam-orion-agent-core-runtime` *(futuro, PR #44)* | IAM role asumido por el contenedor dentro de Bedrock AgentCore (`<project>-agent-core-runtime-<env>`) | Bedrock AgentCore Runtime (trust `bedrock-agentcore.amazonaws.com`) |
+| `modules/bedrock-agent-core-runtime` *(futuro, PR #45)* | `aws_bedrockagentcore_agent_runtime` + `aws_bedrockagentcore_agent_runtime_endpoint` | Bedrock AgentCore Runtime (deploys subsecuentes) |
 
 Wire up al wiring de `live/dev/main.tf` (despues del modulo `ssm-bootstrap`):
 
 ```hcl
-module "ecr_orion_agent" {
-  source          = "../../modules/ecr-orion-agent"
+module "ecr_orion_agent_core" {
+  source          = "../../modules/ecr-orion-agent-core"
   project_name    = var.project_name
   environment     = var.environment
   image_tag_mutability = "MUTABLE" # dev only
@@ -177,34 +179,36 @@ module "ecr_orion_agent" {
   tags                 = local.common_tags
 }
 
-module "iam_orion_agent_dev" {
-  source            = "../../modules/iam-orion-agent-dev"
+module "iam_orion_agent_core_deploy" {
+  source            = "../../modules/iam-orion-agent-core-deploy"
   project_name      = var.project_name
   environment       = var.environment
   github_repository = "ahincho/orion-cognitive-agent"
-  oidc_provider_arn = module.oidc_github.oidc_provider_arn
-  ecr_repository_arn = module.ecr_orion_agent.repository_arn
+  oidc_provider_arn  = module.oidc_github.oidc_provider_arn
+  ecr_repository_arn = module.ecr_orion_agent_core.repository_arn
   tags              = local.common_tags
 }
 
 # Cross-cycle resource: el deploy role debe poder pull del ECR repo.
 # Se declara fuera de los modulos para romper el ciclo ecr <-> iam.
-resource "aws_ecr_repository_policy" "orion_agent" {
-  repository = module.ecr_orion_agent.repository_name
+resource "aws_ecr_repository_policy" "orion_agent_core" {
+  repository = module.ecr_orion_agent_core.repository_name
   policy     = jsonencode({ ... })
 }
 ```
 
 Outputs en `live/dev/outputs.tf`:
 
-- `orion_agent_deploy_role_arn` -> wire a GitHub Secret `AGENT_DEPLOY_ROLE_ARN` en `orion-cognitive-agent`.
-- `orion_agent_ecr_repository_uri` -> registry URL del ECR repo.
+- `orion_agent_core_deploy_role_arn` -> wire a GitHub Secret `AGENT_DEPLOY_ROLE_ARN` en `orion-cognitive-agent`.
+- `orion_agent_core_ecr_repository_uri` -> registry URL del ECR repo.
+- (futuros) `orion_agent_core_runtime_role_arn`, `orion_agent_core_runtime_id`, `orion_agent_core_runtime_arn`, `orion_agent_core_runtime_endpoint_arn`.
 
 ### Ciclo `ecr <-> iam` y como se rompe
 
-1. `iam_orion_agent_dev` necesita `ecr_repository_arn` (input del modulo).
+1. `iam_orion_agent_core_deploy` necesita `ecr_repository_arn` (input del modulo).
 2. ECR repo policy (`aws_ecr_repository_policy`) necesita permitir pull al deploy role (output del modulo iam).
-3. **Solucion**: el modulo ECR NO acepta `principal_arns_with_pull` por default (queda `[]`). En `live/dev/main.tf` declaramos `aws_ecr_repository_policy.orion_agent` que referencia `module.iam_orion_agent_dev.deploy_role_arn` directamente (fuera del modulo ECR). Asi no hay cycle y la policy es editable sin reemplazar el modulo.
+3. **Solucion**: el modulo ECR NO acepta `principal_arns_with_pull` por default (queda `[]`). En `live/dev/main.tf` declaramos `aws_ecr_repository_policy.orion_agent_core` que referencia `module.iam_orion_agent_core_deploy.deploy_role_arn` directamente (fuera del modulo ECR). Asi no hay cycle y la policy es editable sin reemplazar el modulo.
+4. **Extension futura** (PR #44): cuando se anada `module.iam_orion_agent_core_runtime`, el ARN de ese role tambien debe agregarse al `Principal.AWS` del mismo `aws_ecr_repository_policy.orion_agent_core`, para que el container pueda pull la imagen al arrancar. Esto se hara en la PR que introduce el modulo runtime.
 
 [cog]: https://github.com/ahincho/orion-cognitive-agent
 
