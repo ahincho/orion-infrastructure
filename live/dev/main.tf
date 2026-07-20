@@ -311,7 +311,7 @@ module "bedrock_agent_core_runtime" {
   #   - LOG_LEVEL: standard Python logging level.
   environment_variables = {
     AWS_REGION       = "us-east-1"
-    BEDROCK_MODEL_ID = "us.anthropic.claude-sonnet-4-5-20250929" # placeholder; ajustar en el workflow de deploy
+    BEDROCK_MODEL_ID = "us.anthropic.claude-sonnet-4-6" # Sonnet 4.6 (cross-region inference profile, ACTIVE, verificado en dev)
     LOG_LEVEL        = "INFO"
     ORION_AGENT_NAME = "OrionAgentCore"
     ORION_AGENT_ENV  = "dev"
