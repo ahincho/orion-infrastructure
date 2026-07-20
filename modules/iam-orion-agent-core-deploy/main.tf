@@ -12,16 +12,22 @@ data "aws_region" "current" {}
 ###############################################################################
 # Trust policy: GitHub Actions OIDC para orion-cognitive-agent
 # -----------------------------------------------------------------------------
-# Asumible solo desde el ref:refs/heads/main del repo. Permite a cualquier job
-# de CI/CD del repo obtener credenciales AWS de corta duracion sin necesidad
-# de long-lived access keys. El provider real es el de modules/oidc-github,
-# compartido entre repos ORION.
+# Asumible desde cualquier sub-claim que matche ``repo:<github_repository>:*``.
+# Esto cubre los formatos generados por GitHub Actions:
+#   - ``push`` event:            ``repo:<owner>/<repo>:ref:refs/heads/main``
+#   - ``workflow_dispatch``:     ``repo:<owner>/<repo>:workflow_dispatch:<path>@<ref>``
+#   - ``pull_request``:          ``repo:<owner>/<repo>:pull_request/<n>/merge``
+#   - reusable ``workflow_call``: ``repo:<owner>/<repo>:workflow_call.yml/<runner>/<attempt>``
+# No restringimos a una rama especifica porque queremos permitir re-runs
+# manuales via ``workflow_dispatch`` ademas del trigger automatico por push a
+# main. El scope por repo sigue siendo estricto (solo OIDC tokens emitidos
+# para este repo satisfacen ``StringLike repo:<github_repository>:*``).
 ###############################################################################
 data "aws_iam_policy_document" "trust" {
   # checkov:skip=CKV_AWS_60:GitHub OIDC trust no requiere permissions boundary en el trust policy (se aplican via iam:PermissionsBoundary si se necesita).
-  # checkov:skip=CKV_AWS_61:GitHub OIDC trust usa sub claim explicito (main), no requiere sts:SourceIdentity adicional.
-  # checkov:skip=CKV_AWS_107:Role asumido solo por GitHub Actions OIDC, no por usuarios humanos (no requiere sts:ExternalValidation).
-  # checkov:skip=CKV_AWS_358:Rol GitHub OIDC no requiere captcha (no es login humano). El apply-only scope ya esta enforced por OIDC sub claim.
+  # checkov:skip=CKV_AWS_61:GitHub OIDC trust usa sub claim restringido al repo via StringLike, no requiere sts:SourceIdentity adicional.
+  # checkov:skip=CKV_AWS_107:Role asumible solo por GitHub Actions OIDC (aud = sts.amazonaws.com enforceado), no por usuarios humanos (no requiere sts:ExternalValidation).
+  # checkov:skip=CKV_AWS_358:Rol GitHub OIDC no requiere captcha (no es login humano).
   statement {
     sid     = "GitHubActionsOIDC"
     effect  = "Allow"
@@ -41,7 +47,7 @@ data "aws_iam_policy_document" "trust" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:ref:refs/heads/main"]
+      values   = ["repo:${var.github_repository}:*"]
     }
   }
 }
