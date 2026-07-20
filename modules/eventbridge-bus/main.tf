@@ -182,10 +182,18 @@ resource "aws_cloudwatch_event_rule" "log_all" {
 resource "aws_cloudwatch_event_target" "log_all" {
   count = var.enable_default_log_rule ? 1 : 0
 
-  rule = aws_cloudwatch_event_rule.log_all[0].name
-  arn  = aws_cloudwatch_log_group.event_log[0].arn
-
-  target_id = "cw-log-group"
+  # aws_cloudwatch_event_target schema (AWS provider v6):
+  #   - rule            required (string): nombre de la regla.
+  #   - arn             required (string): ARN del TARGET (no de la regla).
+  #   - event_bus_name  optional (string): bus donde vive la regla.
+  #
+  # Para apuntar a una regla en un CUSTOM bus, debemos pasar `event_bus_name`.
+  # Sin esto, AWS busca la regla en el bus default y devuelve
+  # "Rule ... does not exist on EventBus default".
+  rule           = aws_cloudwatch_event_rule.log_all[0].name
+  event_bus_name = aws_cloudwatch_event_bus.main.name
+  target_id      = "cw-log-group"
+  arn            = aws_cloudwatch_log_group.event_log[0].arn
 
   depends_on = [aws_iam_role_policy.events_log_writer_put]
 }
