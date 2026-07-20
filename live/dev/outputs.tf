@@ -161,6 +161,24 @@ output "lambda_security_group_id" {
 }
 
 ###############################################################################
+# Phase 1.7 outputs: SAM deploy role
+# -----------------------------------------------------------------------------
+# ARN del rol IAM que el workflow `CD - Deploy` de orion-backend asume via
+# GitHub OIDC para correr `sam build` y `sam deploy`. Wire al GitHub
+# Environment secret `AWS_DEPLOY_ROLE_ARN` (orion-backend / env: dev).
+# Reemplaza al rol legacy `spark-match-sam-deploy-dev`.
+###############################################################################
+output "orion_sam_deploy_role_arn" {
+  description = "ARN del IAM role orion-sam-deploy-dev (asumido por el CD - Deploy workflow de orion-backend). Wire a GitHub Environment secret AWS_DEPLOY_ROLE_ARN."
+  value       = module.iam_sam_deploy_dev.role_arn
+}
+
+output "orion_sam_deploy_role_name" {
+  description = "Nombre (sin ARN) del IAM role orion-sam-deploy-dev."
+  value       = module.iam_sam_deploy_dev.role_name
+}
+
+###############################################################################
 # Phase 1 outputs: SSM parameter paths (que orion-backend resuelve via {{resolve:ssm:...}})
 ###############################################################################
 output "ssm_jwt_secret_arn_param" {
