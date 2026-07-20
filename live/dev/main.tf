@@ -226,10 +226,12 @@ module "ssm_bootstrap" {
 #   orion-cognitive-agent para deploys del agent (ECR pull + Bedrock AgentCore
 #   control/data plane + Bedrock InvokeModel + CloudWatch logs + SSM read +
 #   iam:PassRole hacia bedrock-agentcore.amazonaws.com).
-# - aws_ecr_repository_policy.orion_agent_core: otorga pull al deploy role.
-#   Definido en live/dev (no en el modulo) para evitar cycle entre los 2 modulos.
-# - (futuro) module.iam_orion_agent_core_runtime: role asumido por el
-#   contenedor dentro del AgentCore Runtime (PR #44).
+# - module.iam_orion_agent_core_runtime: role asumido por el contenedor
+#   dentro del AgentCore Runtime (PR #44). Permisos minimos: Bedrock
+#   InvokeModel + CloudWatch logs sobre /aws/bedrock-agentcore/*.
+# - aws_ecr_repository_policy.orion_agent_core: otorga pull al deploy role +
+#   al runtime role. Definido en live/dev (no en el modulo) para evitar cycle
+#   entre los 3 modulos.
 # - (futuro) module.bedrock_agent_core_runtime: aws_bedrockagentcore_agent_runtime
 #   + aws_bedrockagentcore_agent_runtime_endpoint (PR #45).
 ###############################################################################
@@ -260,12 +262,36 @@ module "iam_orion_agent_core_deploy" {
   oidc_provider_arn  = module.oidc_github.oidc_provider_arn
   ecr_repository_arn = module.ecr_orion_agent_core.repository_arn
 
+  # Permite al deploy job pasar el runtime execution role al servicio
+  # bedrock-agentcore al crear/actualizar el AgentRuntime (PR #45).
+  # El bloque dynamic "statement" del modulo solo se materializa si esta
+  # lista tiene > 0 elementos.
+  agentcore_runtime_role_arns = [
+    module.iam_orion_agent_core_runtime.runtime_role_arn,
+  ]
+
   tags = local.common_tags
 }
 
-# Cross-cycle resourceless wire: el deploy role necesita pull del ECR repo.
-# Se rompe el ciclo iam <-> ecr declarando el aws_ecr_repository_policy
-# directamente en live/dev (fuera de cualquier modulo).
+# Modulo runtime execution role.
+# Provisionado vacio de condition estricta de SourceArn hasta que el
+# AgentRuntime exista (PR #45). Ver AGENTS.md seccion "orion-cognitive-agent
+# infra (Phase 1.6)" para el rationale del 2-fases bootstrap.
+module "iam_orion_agent_core_runtime" {
+  source = "../../modules/iam-orion-agent-core-runtime"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  # runtime_arn = "" (default; se actualiza en una PR futura tras crear
+  # el AgentRuntime y copiar su ARN aqui).
+
+  tags = local.common_tags
+}
+
+# Cross-cycle resourceless wire: el deploy role + el runtime role necesitan
+# pull del ECR repo. Se rompe el ciclo iam <-> ecr declarando el
+# aws_ecr_repository_policy directamente en live/dev (fuera de cualquier modulo).
 resource "aws_ecr_repository_policy" "orion_agent_core" {
   repository = module.ecr_orion_agent_core.repository_name
 
@@ -273,10 +299,13 @@ resource "aws_ecr_repository_policy" "orion_agent_core" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "AllowPullForOrionAgentCoreDeployRole"
+        Sid    = "AllowPullForOrionAgentCorePrincipals"
         Effect = "Allow"
         Principal = {
-          AWS = module.iam_orion_agent_core_deploy.deploy_role_arn
+          AWS = [
+            module.iam_orion_agent_core_deploy.deploy_role_arn,
+            module.iam_orion_agent_core_runtime.runtime_role_arn,
+          ]
         }
         Action = [
           "ecr:GetDownloadUrlForLayer",

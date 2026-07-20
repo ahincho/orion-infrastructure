@@ -220,3 +220,13 @@ output "orion_agent_core_ecr_repository_name" {
   description = "Nombre (sin ARN, sin registry URL) del ECR repository del agent."
   value       = module.ecr_orion_agent_core.repository_name
 }
+
+output "orion_agent_core_runtime_role_arn" {
+  description = "ARN del IAM role assumido por el contenedor dentro del Bedrock AgentCore Runtime. Wire como role_arn en el modulo bedrock-agent-core-runtime (PR #45). Anadirlo a AGENT_DEPLOY_ROLE_ARN no aplica (es el role de runtime, no el de deploy)."
+  value       = module.iam_orion_agent_core_runtime.runtime_role_arn
+}
+
+output "orion_agent_core_runtime_role_name" {
+  description = "Nombre (sin ARN) del IAM runtime execution role."
+  value       = module.iam_orion_agent_core_runtime.runtime_role_name
+}
