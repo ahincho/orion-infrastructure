@@ -47,11 +47,16 @@
 ###############################################################################
 
 data "aws_caller_identity" "current" {}
-data "aws_region" "current" {}
+
+# Region: tomada de var.aws_region (pasada por live/dev, validada en
+# variables.tf) en lugar de la data source `aws_region`, que ahora es
+# redundante (tflint:terraform_unused_declarations si la region se obtiene
+# de ambos lados). El caller siempre pasa `aws_region = var.aws_region`
+# desde `live/dev/main.tf`; usar esa misma fuente simplifica el modulo.
 
 locals {
   account_id = data.aws_caller_identity.current.account_id
-  region     = data.aws_region.current.region
+  region     = var.aws_region
 
   cfn_stack_arns = [
     "arn:aws:cloudformation:${local.region}:${local.account_id}:stack/orion-backend-dev",
