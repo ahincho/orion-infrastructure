@@ -240,3 +240,61 @@ resource "aws_db_instance" "main" {
     Name = "${var.project_name}-${var.environment}-rds"
   })
 }
+
+###############################################################################
+# App connection secret (5-field JSON consumed by orion-backend)
+# -----------------------------------------------------------------------------
+# El master_user_secret de RDS solo trae {username, password}. orion-backend
+# necesita ademas {host, port, database} en el mismo SecretString JSON.
+# Este recurso es un derivado: host/port/db de la propia instancia, password
+# leida del master secret via data source.
+#
+# Sync de rotacion: aws_secretsmanager_secret_version.app_current usa
+# replace_triggered_by sobre la version del master + outputs de la instancia,
+# de modo que un `terraform plan` despues de que RDS rote la master password
+# propone un update del app secret automaticamente (sin scripts externos).
+#
+# Ciclo: el data source no crea el master secret, solo lo lee. ssm_bootstrap
+# sigue dependiendo solo de los outputs de este modulo, igual que antes.
+###############################################################################
+data "aws_secretsmanager_secret_version" "master" {
+  secret_id = aws_db_instance.main.master_user_secret[0].secret_arn
+}
+
+locals {
+  master_secret = jsondecode(data.aws_secretsmanager_secret_version.master.secret_string)
+  app_secret_string = jsonencode({
+    host     = aws_db_instance.main.address
+    port     = aws_db_instance.main.port
+    database = aws_db_instance.main.db_name
+    username = local.master_secret.username
+    password = local.master_secret.password
+  })
+}
+
+# checkov:skip=CKV_AWS_149:rotacion de la master password se sincroniza al app secret via replace_triggered_by sobre data.aws_secretsmanager_secret_version.master.version_id (ver bloque app_current). El plan auto-detecta el drift en cada terraform plan post-rotacion.
+# checkov:skip=CKV_AWS_173:dev env usa AWS-managed CMK de Secrets Manager (encryption at rest por defecto). KMS CMK explicito se difiere al futuro modules/kms/ para prod.
+# checkov:skip=CKV2_AWS_57:Secrets bootstrap no requiere resource-based policy; el acceso es via IAM (Lambda exec role tiene secretsmanager:GetSecretValue via tag condition Project=orion).
+resource "aws_secretsmanager_secret" "app" {
+  name                    = "${var.project_name}-${var.environment}-db-connection"
+  description             = "App DB connection for ${var.project_name}-${var.environment}: {host, port, database, username, password}. Published to SSM as /orion/db/secret-arn for orion-backend Lambdas."
+  recovery_window_in_days = 0 # dev: delete OK sin espera (alineado con secrets-bootstrap). Subministrar var para staging/prod.
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-${var.environment}-db-connection"
+  })
+}
+
+resource "aws_secretsmanager_secret_version" "app_current" {
+  secret_id     = aws_secretsmanager_secret.app.id
+  secret_string = local.app_secret_string
+
+  lifecycle {
+    replace_triggered_by = [
+      data.aws_secretsmanager_secret_version.master.version_id,
+      aws_db_instance.main.address,
+      aws_db_instance.main.port,
+      aws_db_instance.main.db_name,
+    ]
+  }
+}

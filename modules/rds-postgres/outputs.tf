@@ -43,6 +43,16 @@ output "master_user_secret_arn" {
   value       = try(aws_db_instance.main.master_user_secret[0].secret_arn, null)
 }
 
+output "app_connection_secret_arn" {
+  description = "ARN del Secrets Manager secret de aplicacion (5 campos JSON: host, port, database, username, password). Es el que orion-backend consume via SSM /orion/db/secret-arn."
+  value       = aws_secretsmanager_secret.app.arn
+}
+
+output "app_connection_secret_name" {
+  description = "Nombre (sin ARN) del secreto de aplicacion."
+  value       = aws_secretsmanager_secret.app.name
+}
+
 output "security_group_id" {
   description = "ID del SG dedicado de la DB."
   value       = aws_security_group.db.id
