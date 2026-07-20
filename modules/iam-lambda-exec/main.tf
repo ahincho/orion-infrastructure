@@ -83,9 +83,14 @@ resource "aws_iam_role_policy_attachment" "vpc_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
+# X-Ray: AWS no provee un managed policy 'AWSLambdaTracingExecutionRole' (ese
+# nombre NO existe). El managed policy correcto para escribir trace data es
+# AWSXRayDaemonWriteAccess (provee xray:PutTraceSegments + PutTraceDocuments +
+# GetSamplingTargets + GetSamplingRules). Adicionalmente el X-Ray daemon corre
+# en sidecar (orion-backend no usa sidecar) por lo que no se necesita daemon write.
 resource "aws_iam_role_policy_attachment" "xray_execution" {
   role       = aws_iam_role.lambda_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaTracingExecutionRole"
+  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
 }
 
 ###############################################################################
