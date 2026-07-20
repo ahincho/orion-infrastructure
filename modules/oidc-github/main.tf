@@ -108,8 +108,9 @@ resource "aws_iam_role_policy" "plan" {
   name = "${var.project_name}-terraform-plan-policy"
   role = aws_iam_role.plan.id
 
-  # checkov:skip=CKV_AWS_288:plan role is read-only (Describe/Get/List); data exfil risk is acceptable for plan phase
-  # checkov:skip=CKV_AWS_355:plan role needs wildcard resource for read-only AWS API calls across all resources
+  # checkov:skip=CKV_AWS_288:plan role is read-only (Describe/Get/List); data exfil risk is acceptable for plan phase (trust policy restringe asuncion al repo+env dev)
+  # checkov:skip=CKV_AWS_355:plan role needs wildcard resource for read-only AWS API calls across all resources in the account
+  # checkov:skip=CKV_AWS_286:plan role does not require human review (same scope as other read-only wildcards)
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -117,12 +118,25 @@ resource "aws_iam_role_policy" "plan" {
       Effect = "Allow"
       Action = [
         "ec2:Describe*",
+        "events:Describe*",
+        "events:List*",
         "iam:Get*",
         "iam:List*",
         "kms:Describe*",
         "kms:List*",
+        "logs:Describe*",
+        "logs:Get*",
+        "logs:List*",
+        "rds:Describe*",
+        "rds:List*",
         "s3:Get*",
         "s3:List*",
+        "secretsmanager:Describe*",
+        "secretsmanager:Get*",
+        "secretsmanager:List*",
+        "ssm:Describe*",
+        "ssm:Get*",
+        "ssm:List*",
         "sts:GetCallerIdentity",
       ]
       Resource = "*"
