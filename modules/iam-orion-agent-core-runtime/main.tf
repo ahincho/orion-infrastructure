@@ -93,6 +93,29 @@ data "aws_iam_policy_document" "orion_agent_core_runtime_inline" {
       "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/bedrock-agentcore/*:*",
     ]
   }
+
+  # ECR pull image permissions: cuando Bedrock AgentCore provisiona un AgentRuntime
+  # valida el container_uri contra el role de ejecucion. Sin estos permisos,
+  # CreateAgentRuntime falla con ValidationException ("Access denied while validating
+  # ECR URI ... execution role requires permissions for ecr:GetAuthorizationToken,
+  # ecr:BatchGetImage, and ecr:GetDownloadUrlForLayer operations").
+  #
+  # Notas de scoping:
+  #   - ecr:GetAuthorizationToken es registry-level (siempre Resource = "*").
+  #   - ecr:BatchGetImage y ecr:GetDownloadUrlForLayer son repo-level pero
+  #     Resource "*" aqui; la repo policy (aws_ecr_repository_policy
+  #     .orion_agent_core en live/dev/main.tf) restringe el repo a este role
+  #     + el deploy role. Defense-in-depth via repo policy.
+  statement {
+    sid    = "ECRPullImageForAgentRuntime"
+    effect = "Allow"
+    actions = [
+      "ecr:GetAuthorizationToken",
+      "ecr:BatchGetImage",
+      "ecr:GetDownloadUrlForLayer",
+    ]
+    resources = ["*"]
+  }
 }
 
 ###############################################################################
