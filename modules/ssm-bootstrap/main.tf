@@ -26,10 +26,11 @@ locals {
   common_tags = merge(
     var.tags,
     {
-      Module     = "ssm-bootstrap"
-      Project    = var.project_name
-      ManagedBy  = "terraform"
-      Repository = "ahincho/orion-infrastructure"
+      Module      = "ssm-bootstrap"
+      Project     = var.project_name
+      Environment = var.environment
+      ManagedBy   = "terraform"
+      Repository  = "ahincho/orion-infrastructure"
     }
   )
 
