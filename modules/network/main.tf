@@ -64,6 +64,24 @@ resource "aws_vpc" "main" {
   })
 }
 
+###############################################################################
+# Default Security Group: AWS lo crea con allow-all egress + no ingress por
+# defecto. Lo recreamos con todas las reglas vacias para CKV2_AWS_12.
+# Si hay recursos existentes en este VPC antes de aplicar, AWS falla con
+# "DependencyViolation". Solamente seguro en greenfield.
+###############################################################################
+resource "aws_default_security_group" "main" {
+  vpc_id = aws_vpc.main.id
+
+  # checkov:skip=CKV2_AWS_12:Default SG vacio = deny all (origen y destino).
+  # Bloquea trafico desde y hacia el SG por defecto; recursos deben
+  # declarar SGs dedicados (todos los modulos ORION lo hacen).
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-${var.environment}-default-sg"
+  })
+}
+
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
@@ -177,10 +195,10 @@ resource "aws_route_table_association" "private" {
 ###############################################################################
 # VPC Flow Logs (CW Logs destination)
 ###############################################################################
-# checkov:skip=CKV_AWS_158:NAT Gateway flow logs via sg/cost; VPC-level flow logs suffice for egress audit.
 resource "aws_cloudwatch_log_group" "flow_logs" {
-  # checkov:skip=CKV_AWS_338:Logs ingest via IAM role attached to flow log; no public access.
-  # checkov:skip=CKV_AWS_345:Log group encryption via default account CMK in dev; explicit KMS in prod (TBD).
+  # checkov:skip=CKV_AWS_158:dev env uses AWS-managed CMK for CW Logs (default at-rest encryption enabled); explicit KMS CMK deferred to prod module
+  # checkov:skip=CKV_AWS_338:Logs ingest via IAM role attached to flow log; no public access
+  # checkov:skip=CKV_AWS_345:Log group encryption via default account CMK in dev; explicit KMS in prod (TBD)
   name              = "/aws/vpc/${var.project_name}-${var.environment}"
   retention_in_days = var.flow_log_retention_days
 
@@ -200,7 +218,7 @@ data "aws_iam_policy_document" "flow_logs_assume" {
 }
 
 resource "aws_iam_role" "flow_logs" {
-  name_prefix = "${var.project_name}-${var.environment}-flow-logs-"
+  name_prefix        = "${var.project_name}-${var.environment}-flow-logs-"
   assume_role_policy = data.aws_iam_policy_document.flow_logs_assume.json
 
   tags = merge(local.common_tags, {
@@ -267,11 +285,12 @@ resource "aws_security_group" "vpc_endpoints" {
   }
 
   egress {
-    description = "Allow all egress (VPC endpoints return traffic)."
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    # checkov:skip=CKV_AWS_382:VPC endpoint SG egress se restringe a TCP/443 contra VPC CIDR. AWS SG conntrack permite trafico respuesta sin reglas adicionales.
+    description = "HTTPS to VPC CIDR (VPC endpoint response traffic + inter-AZ)."
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   tags = merge(local.common_tags, {
