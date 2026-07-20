@@ -26,6 +26,7 @@
 /modules/oidc-github/                        @ahincho
 /modules/iam-orion-agent-core-deploy/        @ahincho
 /modules/iam-orion-agent-core-runtime/       @ahincho
+/modules/bedrock-agent-core-runtime/         @ahincho
 /modules/ecr-orion-agent-core/               @ahincho
 
 # Documentacion tecnica.
