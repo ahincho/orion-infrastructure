@@ -48,18 +48,18 @@ Este repo define la **infraestructura AWS del proyecto**.
   unica var accesible desde ese contexto son las repo-scoped.
 - **Para production en el futuro** se duplica el caller con valores
   hardcoded para prod (`environment: prod`, `backend-bucket: orion-tfstate-prod`,
-  etc.) — o se mantiene el caller y se usa un wrapper distinto. Ver
+  etc.) â€” o se mantiene el caller y se usa un wrapper distinto. Ver
   seccion "Agregar un segundo AWS environment".
 
 ## Branching
 
 ```
 main (protegida, 1 ruleset)
-  â””â”€â”€ feat/<scope>-<name>
-  â””â”€â”€ fix/<scope>-<name>
-  â””â”€â”€ chore/<scope>-<name>
-  â””â”€â”€ docs/<scope>-<name>
-  â””â”€â”€ ci/<scope>-<name>
+  Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ feat/<scope>-<name>
+  Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ fix/<scope>-<name>
+  Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ chore/<scope>-<name>
+  Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ docs/<scope>-<name>
+  Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ ci/<scope>-<name>
 ```
 
 - PR target: `main` directamente (no hay dev intermedia).
@@ -72,15 +72,15 @@ main (protegida, 1 ruleset)
 Pendiente de crear (despues del bootstrap):
 
 - **GitHub Secrets (2):** valores sensibles. Cifrados en reposo.
-  - `AWS_PLAN_ROLE_ARN` — ARN del IAM role `orion-terraform-plan`
+  - `AWS_PLAN_ROLE_ARN` â€” ARN del IAM role `orion-terraform-plan`
     (read-only, asumido por GH Actions en PRs contra `main`).
-  - `AWS_APPLY_ROLE_ARN` — ARN del IAM role `orion-terraform-apply`
+  - `AWS_APPLY_ROLE_ARN` â€” ARN del IAM role `orion-terraform-apply`
     (write, restringido por `aws:RequestedRegion` a `us-east-1`).
 - **GitHub Variable (1):** repo-scoped, no sensible, versionado en
   codigo via `gh variable set`. Ver seccion arriba.
   - `TF_VERSION` = `1.15.7`.
 - **GitHub Environment (1):**
-  - `dev` — branch policy = `main`, sin reviewers, auto-approve=true.
+  - `dev` â€” branch policy = `main`, sin reviewers, auto-approve=true.
 
 El script `scripts/setup-oidc.sh` crea los IAM roles en AWS.
 El script `docs/SETUP.md` documenta los pasos para `gh secret set`.
@@ -92,7 +92,7 @@ El script `docs/SETUP.md` documenta los pasos para `gh secret set`.
    `spark-match-admin`). Si necesitas el Key ID bajo un perfil, usa
    `aws configure get aws_access_key_id --profile <nombre>` en lugar
    de pegarlo en el codigo. **Si una key se filtra al repo por error,
-   rotala inmediatamente en la consola de AWS** — el key ID viejo en
+   rotala inmediatamente en la consola de AWS** â€” el key ID viejo en
    `git log` es entonces texto muerto.
 2. **Nunca** commitear `.tfstate`, `.terraform/`, ni archivos con
    secretos fuera de GH Secrets. `.gitignore` ya los excluye; respeta
@@ -153,6 +153,47 @@ Si mas adelante se quiere producir a production:
 
 Por ahora NO se hace.
 
+
+## orion-cognitive-agent infra (Phase 1.6)
+
+Modulos adicionales para soportar el deploy del cognitive agent
+(orion-cognitive-agent repo) a **Bedrock AgentCore Runtime**:
+
+| Module | Proposito | Outputs clave |
+|---|---|---|
+| modules/iam-orion-agent-dev/ | IAM role asumido por el workflow CD - Deploy de orion-cognitive-agent. Permisos: ECR push + AgentCore mgmt + Bedrock InvokeModel + CW Logs + SSM read + PassRole a bedrock-agentcore. | ole_arn (set as AWS_DEPLOY_ROLE_ARN en GH Env dev del repo cognitivo) |
+| modules/ecr-orion-agent/ | ECR repo orion-agent con tags inmutables + scan_on_push + AES256 + lifecycle (max 30 imagenes). RBP permite push al deploy role. | epository_uri (set as ECR_REPOSITORY_URI en el workflow de deploy) |
+
+### Decisiones de diseno
+
+- **IAM deploy role** es OIDC (audience=sts.amazonaws.com, sub restringido a
+  epo:ahincho/orion-cognitive-agent:ref:refs/heads/main*environment:dev).
+  No recrea el OIDC provider - asume modules/oidc-github aplicado primero.
+- **ECR immutability + scan_on_push** son mandatorios. AES256 (sin KMS)
+  para mantener zero-cost dev, matching la estrategia de
+  modules/storage-tfstate.
+- **Execution role** del container (Sprint B.2: orion-agent-exec-*) no se
+  crea aqui; se crea en el modulo edrock-agentcore-runtime cuando el
+  Runtime este definido. La statement IAMPassRoleToBedrockAgentCore ya
+  referencia el pattern orion-agent-exec-* para forward-compat.
+
+### Sprint B.2 plan (futuro)
+
+- Anadir modules/bedrock-agentcore-runtime/ con los recursos
+  ws_bedrockagentcore_* (Runtime + IAM execution role).
+- Cross-reference: el ARN del Runtime se pasa como input al modulo
+  iam-orion-agent-dev para que las acciones edrock-agentcore:* pasen
+  de Resource = \"*\" a ARN-scoped explicit.
+- Anadir segunda statement al ECR RBP para permitir pull al execution role.
+
+### Sprint C plan (futuro)
+
+Crear el workflow deploy-dev.yml en hincho/orion-cognitive-agent
+que asuma module.iam_orion_agent_dev.role_arn (via
+ws-actions/configure-aws-credentials), haga make qa (gate de calidad)
++ docker build + ws ecr get-login-password + docker push a
+module.ecr_orion_agent.repository_uri, y termine con
+ws bedrock-agentcore update-agent-runtime (idempotente).
 ## Contacto
 
 - Owner: `@ahincho` (solo-dev).

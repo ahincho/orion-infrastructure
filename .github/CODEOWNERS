@@ -27,3 +27,5 @@
 
 # Documentacion tecnica.
 /docs/                                       @ahincho
+/modules/iam-orion-agent-dev/                @ahincho
+/modules/ecr-orion-agent/                    @ahincho

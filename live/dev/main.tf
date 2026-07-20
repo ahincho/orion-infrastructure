@@ -78,11 +78,32 @@ module "network" {
 
   single_nat_gateway = true # dev cost-saving (~32 USD/mes)
 
-  # VPC endpoints interfaz cuestan ~$87/mes (6 endpoints x $0.01/h x 2 AZs).
-  # Para free-tier, las Lambdas hablan a AWS APIs via NAT Gateway con
-  # latencia ligeramente mayor pero zero-cost. Activar cuando se migre
-  # a prod o cuando se quiera single-digit-ms latency to SM/SSM/ECR.
-  enable_vpc_endpoints    = false
+  # VPC-attached Lambdas in orion-backend cannot reach the public AWS
+  # service endpoints from the private subnets: there is no NAT route
+  # for the traffic class that the SDK uses, and the VPC only has an
+  # S3 gateway endpoint. As a result every Lambda invocation hangs in
+  # the inlineCorsMiddleware (`ssm.getRequiredString` for the CORS
+  # allowlist) for the full 15s Lambda timeout, and API Gateway
+  # surfaces it as a 500.
+  #
+  # Enabling Interface VPC Endpoints for the four services that the
+  # runtime + dev tooling actually needs lets the SDK hit them over
+  # private IPs in the VPC subnets, so `ssm:`, `secretsmanager:`,
+  # `events:` and the X-Ray collector all become reachable from the
+  # Lambda ENIs without any change to the Lambda code.
+  #
+  # Cost: 4 endpoints * 2 AZs * $0.01/h = $0.08/h, ~$58/mes. We
+  # intentionally omit `logs`, `ecr.api`, `ecr.dkr` (default): the
+  # Lambdas run from S3 + bundled layers, never Image, so ECR is not
+  # used, and CloudWatch Logs are delivered via the Lambda execution
+  # role, not the Lambda network path.
+  enable_vpc_endpoints = true
+  vpc_endpoint_services = [
+    "ssm",
+    "secretsmanager",
+    "events",
+    "xray",
+  ]
   flow_log_retention_days = 30
 
   tags = local.common_tags

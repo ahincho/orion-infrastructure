@@ -183,3 +183,31 @@ output "ssm_cors_origins_value" {
   value       = module.ssm_bootstrap.cors_allowed_origins_value
   sensitive   = true
 }
+
+###############################################################################
+# Phase 1.6 outputs: orion-cognitive-agent infra (AgentCore + ECR)
+###############################################################################
+output "orion_agent_deploy_role_arn" {
+  description = "ARN del IAM role orion-agent-deploy-dev. Set as AWS_DEPLOY_ROLE_ARN en el GH Environment dev de orion-cognitive-agent."
+  value       = module.iam_orion_agent_dev.role_arn
+}
+
+output "orion_agent_deploy_role_name" {
+  description = "Nombre del IAM role agent deploy (orion-agent-deploy-dev)."
+  value       = module.iam_orion_agent_dev.role_name
+}
+
+output "orion_agent_ecr_repository_uri" {
+  description = "URI del ECR repo donde orion-cognitive-agent pushea la imagen Docker (formato <account>.dkr.ecr.us-east-1.amazonaws.com/orion-agent). Usar como ECR_REPOSITORY_URI en el deploy workflow."
+  value       = module.ecr_orion_agent.repository_uri
+}
+
+output "orion_agent_ecr_repository_arn" {
+  description = "ARN del ECR repo del agente."
+  value       = module.ecr_orion_agent.repository_arn
+}
+
+output "orion_agent_ecr_repository_name" {
+  description = "Nombre del ECR repo del agente (orion-agent)."
+  value       = module.ecr_orion_agent.repository_name
+}
