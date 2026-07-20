@@ -272,10 +272,10 @@ locals {
   })
 }
 
-# checkov:skip=CKV_AWS_149:rotacion de la master password se sincroniza al app secret via replace_triggered_by sobre data.aws_secretsmanager_secret_version.master.version_id (ver bloque app_current). El plan auto-detecta el drift en cada terraform plan post-rotacion.
-# checkov:skip=CKV_AWS_173:dev env usa AWS-managed CMK de Secrets Manager (encryption at rest por defecto). KMS CMK explicito se difiere al futuro modules/kms/ para prod.
-# checkov:skip=CKV2_AWS_57:Secrets bootstrap no requiere resource-based policy; el acceso es via IAM (Lambda exec role tiene secretsmanager:GetSecretValue via tag condition Project=orion).
 resource "aws_secretsmanager_secret" "app" {
+  # checkov:skip=CKV_AWS_149:rotacion de la master password se sincroniza al app secret cuando se re-aplica Terraform (los outputs de la instancia cambian -> el app_secret_string local cambia -> el aws_secretsmanager_secret_version se recrea). Auto-rotation no es necesaria en dev; KMS CMK explicito se difiere al futuro modules/kms/ para prod.
+  # checkov:skip=CKV_AWS_173:dev env usa AWS-managed CMK de Secrets Manager (encryption at rest por defecto). KMS CMK explicito se difiere al futuro modules/kms/ para prod.
+  # checkov:skip=CKV2_AWS_57:Secrets bootstrap no requiere resource-based policy; el acceso es via IAM (Lambda exec role tiene secretsmanager:GetSecretValue via tag condition Project=orion).
   name                    = "${var.project_name}-${var.environment}-db-connection"
   description             = "App DB connection for ${var.project_name}-${var.environment}: {host, port, database, username, password}. Published to SSM as /orion/db/secret-arn for orion-backend Lambdas."
   recovery_window_in_days = 0 # dev: delete OK sin espera (alineado con secrets-bootstrap). Subministrar var para staging/prod.
