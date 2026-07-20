@@ -92,8 +92,13 @@ output "rds_master_username" {
 }
 
 output "rds_master_secret_arn" {
-  description = "ARN del Secrets Manager secret con la master password (gestionado por RDS via manage_master_user_password)."
+  description = "ARN del Secrets Manager secret con la master password (gestionado por RDS via manage_master_user_password). NO lo consume orion-backend (usa el app_connection_secret_arn)."
   value       = module.rds_postgres.master_user_secret_arn
+}
+
+output "rds_app_connection_secret_arn" {
+  description = "ARN del secreto de aplicacion que orion-backend consume via SSM /orion/db/secret-arn. Contiene {host, port, database, username, password}."
+  value       = module.rds_postgres.app_connection_secret_arn
 }
 
 output "rds_security_group_id" {
