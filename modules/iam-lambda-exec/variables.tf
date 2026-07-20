@@ -18,12 +18,6 @@ variable "environment" {
   }
 }
 
-variable "secret_arns" {
-  description = "Lista de ARN de Secrets Manager que las Lambdas pueden leer (GetSecretValue). Tpicamente el ARN del JWT + el ARN del RDS master secret."
-  type        = list(string)
-  default     = []
-}
-
 variable "ssm_parameter_arns" {
   description = "Lista de ARN de SSM Parameters que las Lambdas pueden leer (GetParameter). Tpicamente los 4 paths de modules/ssm-bootstrap/."
   type        = list(string)
@@ -36,10 +30,10 @@ variable "eventbridge_bus_arn" {
   default     = ""
 }
 
-variable "rds_db_resource_arn" {
-  description = "ARN del RDS DB resource para IAM database authentication (rds-db:connect). Vacio = omitir este permission."
-  type        = string
-  default     = ""
+variable "secretsmanager_tag_condition" {
+  description = "Si true, anyade una regla inline con condition aws:ResourceTag/Project=<var.project_name> para permitir secretsmanager:GetSecretValue sobre secrets del proyecto. Default true; cycle-avoidance: usar tag wildcard en vez de ARN explicito."
+  type        = bool
+  default     = true
 }
 
 variable "vpc_id" {
