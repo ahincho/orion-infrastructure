@@ -196,7 +196,7 @@ module "ssm_bootstrap" {
 
   # Cross-module wiring (los ARNs ya fueron creados por los otros modulos):
   jwt_secret_arn      = module.secrets_bootstrap.jwt_signing_secret_arn
-  db_secret_arn       = module.rds_postgres.app_connection_secret_arn
+  db_secret_arn       = module.rds_postgres.master_user_secret_arn
   eventbridge_bus_arn = module.eventbridge_bus.bus_arn
 
   # CORS whitelist (default permite localhost:3000 + orion.dev).
