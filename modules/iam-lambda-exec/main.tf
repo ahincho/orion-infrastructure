@@ -40,6 +40,12 @@ locals {
   has_inline_policy = local.has_ssm_params || local.has_eventbridge || var.secretsmanager_tag_condition
 }
 
+# Account/region metadata for ARN construction (KMS alias ARNs son
+# account+region-scoped, no se pueden hardcodear para que el modulo
+# funcione en otras cuentas/regiones).
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
 ###############################################################################
 # IAM Role
 ###############################################################################
@@ -148,6 +154,34 @@ data "aws_iam_policy_document" "lambda_inline" {
       actions   = ["events:PutEvents"]
       resources = [var.eventbridge_bus_arn]
     }
+  }
+
+  # kms:Decrypt sobre las AWS-managed keys necesarias para que la Lambda
+  # pueda DESCIFRAR los SecureString que lee de SSM (`/orion/db/secret-arn`,
+  # `/orion/cors/allowed-origins`, etc.) y los SecretString cifrados con la
+  # default key de Secrets Manager (`alias/aws/secretsmanager`).
+  #
+  # Sin esto, `ssm:GetParameter` sobre un SecureString devuelve el ciphertext
+  # en vez del valor descifrado (la SDK requiere `kms:Decrypt` para
+  # descifrar el blob con la key de KMS). Esto rompe la cadena
+  #   ssm.getRequiredString('/orion/db/secret-arn') -> secrets.getJson(arn)
+  # porque el Lambda termina pasando el ciphertext como `SecretId` a
+  # Secrets Manager.
+  #
+  # Scope: solo las AWS-managed keys de SSM y Secrets Manager (account-wide,
+  # default CMK de ambos servicios). NO se aniade Decrypt sobre customer-managed
+  # keys a nivel generico; si en el futuro un secret o param usa una CMK
+  # propia, se aniade ARN explicito via un statement adicional.
+  statement {
+    sid    = "KMSDecryptForSSMAndSecretsManager"
+    effect = "Allow"
+    actions = [
+      "kms:Decrypt",
+    ]
+    resources = [
+      "arn:aws:kms:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:alias/aws/ssm",
+      "arn:aws:kms:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:alias/aws/secretsmanager",
+    ]
   }
 }
 
