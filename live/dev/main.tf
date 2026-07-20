@@ -144,6 +144,36 @@ module "iam_lambda_exec" {
 }
 
 ###############################################################################
+# Phase 1.7: SAM deploy role (orion-sam-deploy-dev)
+# -----------------------------------------------------------------------------
+# Reemplaza al rol legacy `spark-match-sam-deploy-dev` (parcheado a mano
+# durante el bootstrap inicial) por uno Terraform-managed con naming orion-*
+# y trust policy exclusiva al repo ahincho/orion-backend. El ARN se expone
+# como output Terraform directo (`orion_sam_deploy_role_arn`) para wirearlo
+# manualmente al GitHub Environment secret `AWS_DEPLOY_ROLE_ARN` (orion-backend
+# / env: dev) tras el primer apply.
+#
+# Plan de migracion del rol legacy (post-merge):
+#   1. terraform apply crea orion-sam-deploy-dev (nuevo).
+#   2. Actualizar `AWS_DEPLOY_ROLE_ARN` (env: dev de orion-backend) al nuevo ARN.
+#   3. Push vacio para validar CD - Deploy con el nuevo rol.
+#   4. Si pasa: remover las entradas `repo:ahincho/orion-backend:*` del trust
+#      policy de `spark-match-sam-deploy-dev` (deja solo las entradas del
+#      repo spark-match-03-backend).
+###############################################################################
+module "iam_sam_deploy_dev" {
+  source = "../../modules/iam-sam-deploy-dev"
+
+  project_name      = var.project_name
+  environment       = var.environment
+  aws_region        = var.aws_region
+  oidc_provider_arn = module.oidc_github.oidc_provider_arn
+  github_repository = "ahincho/orion-backend"
+
+  tags = local.common_tags
+}
+
+###############################################################################
 # Phase 1: RDS Postgres (Free-tier compatible)
 # -----------------------------------------------------------------------------
 # Depende de: network.vpc_id, network.private_subnet_ids,
