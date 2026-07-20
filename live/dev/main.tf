@@ -274,17 +274,24 @@ module "iam_orion_agent_core_deploy" {
 }
 
 # Modulo runtime execution role.
-# Provisionado vacio de condition estricta de SourceArn hasta que el
-# AgentRuntime exista (PR #45). Ver AGENTS.md seccion "orion-cognitive-agent
-# infra (Phase 1.6)" para el rationale del 2-fases bootstrap.
+# Trust policy endurecida en 2 fases (ver AGENTS.md seccion "orion-cognitive-
+# agent infra (Phase 1.6)"):
+#   Fase 1 (PR #46): trust loose (solo service principal). Aplica lo que
+#     crea el AgentRuntime y los modulos restantes. Sin condiciones.
+#   Fase 2 (PR #50): tras el primer apply, copiar el output del AgentRuntime
+#     ARN al param `runtime_arn` de este modulo y reaplicar. Esto actualiza
+#     la assume_role_policy in-place (sin recreate role), agregando la
+#     condition `aws:SourceArn` que restringe el assume SOLO al runtime
+#     creado (defense in depth anti-confused-deputy).
 module "iam_orion_agent_core_runtime" {
   source = "../../modules/iam-orion-agent-core-runtime"
 
   project_name = var.project_name
   environment  = var.environment
 
-  # runtime_arn = "" (default; se actualiza en una PR futura tras crear
-  # el AgentRuntime y copiar su ARN aqui).
+  # Fase 1 (PR #46): sin `runtime_arn` (default ""). Trust loose.
+  # Fase 2 (PR #50, post-primer apply): descomentar y reaplicar:
+  #   runtime_arn = module.bedrock_agent_core_runtime.agent_runtime_arn
 
   tags = local.common_tags
 }
