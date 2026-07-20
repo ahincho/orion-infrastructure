@@ -217,3 +217,70 @@ module "ssm_bootstrap" {
 
   tags = local.common_tags
 }
+
+###############################################################################
+# Phase 1.6: Orion Agent infra (Bedrock AgentCore Runtime deployment)
+# -----------------------------------------------------------------------------
+# - module.ecr_orion_agent: ECR repository privado para imagenes del agent.
+# - module.iam_orion_agent_dev: GitHub OIDC role asumido por orion-cognitive-agent
+#   para deploys del agent (ECR pull + Bedrock AgentCore control/data plane).
+# - aws_ecr_repository_policy.orion_agent: otorga pull al deploy role.
+#   Definido en live/dev (no en el modulo) para evitar cycle entre los 2 modulos.
+###############################################################################
+
+module "ecr_orion_agent" {
+  source = "../../modules/ecr-orion-agent"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  image_tag_mutability = "MUTABLE" # dev only: permite retag + rollback
+  scan_on_push         = true
+  max_image_count      = 20
+
+  # principal_arns_with_pull = [] # se aplica via aws_ecr_repository_policy abajo
+
+  tags = local.common_tags
+}
+
+module "iam_orion_agent_dev" {
+  source = "../../modules/iam-orion-agent-dev"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  github_repository = "ahincho/orion-cognitive-agent"
+
+  oidc_provider_arn  = module.oidc_github.oidc_provider_arn
+  ecr_repository_arn = module.ecr_orion_agent.repository_arn
+
+  tags = local.common_tags
+}
+
+# Cross-cycle resourceless wire: el deploy role necesita pull del ECR repo.
+# Se rompe el ciclo iam_orion_agent_dev <-> ecr_orion_agent declarando el
+# aws_ecr_repository_policy directamente en live/dev (fuera de cualquier modulo).
+resource "aws_ecr_repository_policy" "orion_agent" {
+  repository = module.ecr_orion_agent.repository_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowPullForOrionAgentDeployRole"
+        Effect = "Allow"
+        Principal = {
+          AWS = module.iam_orion_agent_dev.deploy_role_arn
+        }
+        Action = [
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:DescribeImages",
+          "ecr:DescribeRepositories",
+          "ecr:ListImages",
+        ]
+      },
+    ]
+  })
+}
