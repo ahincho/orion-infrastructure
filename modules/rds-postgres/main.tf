@@ -89,46 +89,61 @@ resource "aws_security_group" "db" {
 #   - shared_buffers = 16384       (16MB; razonable para t4g.micro 1GB RAM).
 #   - max_connections = 100        (suficiente para Serverless/Lambdas).
 #   - work_mem = 4MB               (bajo consumo de memoria).
+#
+# Importante: en RDS Postgres 16, los parametros STATIC (shared_buffers,
+# max_connections, work_mem, timezone, rds.force_ssl) NO se pueden aplicar
+# con `apply_method = "immediate"`. Requieren `pending-reboot` (= se aplican
+# despues del proximo reinicio de la DB). AWS API rechaza con:
+# "InvalidParameterCombination: cannot use immediate apply method for
+# static parameter".
+#
+# Dynamic parameters (log_statement, log_min_duration_statement) usan
+# immediate por default (cambios en caliente sin restart).
 ###############################################################################
 resource "aws_db_parameter_group" "main" {
   name_prefix = "${var.project_name}-${var.environment}-rds-pg-"
   family      = "postgres16"
 
+  # Dynamic params (apply_method default = "immediate").
   parameter {
     name  = "log_statement"
     value = "all"
   }
 
   parameter {
-    name         = "log_min_duration_statement"
-    value        = "1000"
+    name  = "log_min_duration_statement"
+    value = "1000"
+  }
+
+  # Static params: require pending-reboot.
+  parameter {
+    name         = "shared_buffers"
+    value        = "16384"
     apply_method = "pending-reboot"
   }
 
   parameter {
-    name  = "shared_buffers"
-    value = "16384"
+    name         = "max_connections"
+    value        = "100"
+    apply_method = "pending-reboot"
   }
 
   parameter {
-    name  = "max_connections"
-    value = "100"
+    name         = "work_mem"
+    value        = "4096"
+    apply_method = "pending-reboot"
   }
 
   parameter {
-    name  = "work_mem"
-    value = "4096"
+    name         = "timezone"
+    value        = "UTC"
+    apply_method = "pending-reboot"
   }
 
   parameter {
-    name  = "timezone"
-    value = "UTC"
-  }
-
-  # Force SSL connections (cumple CKV2_AWS_69 encryption in transit).
-  parameter {
-    name  = "rds.force_ssl"
-    value = "1"
+    name         = "rds.force_ssl"
+    value        = "1"
+    apply_method = "pending-reboot"
   }
 
   tags = merge(local.common_tags, {
