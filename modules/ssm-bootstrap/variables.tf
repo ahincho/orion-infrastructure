@@ -53,6 +53,24 @@ variable "cors_allowed_origins" {
   }
 }
 
+variable "lambda_subnet_ids" {
+  description = "Lista de IDs de subnet privadas donde corren las Lambdas (de modules/network.private_subnet_ids). Se publica como /orion/lambda/vpc-subnet-ids comma-separated."
+  type        = list(string)
+  default     = []
+}
+
+variable "lambda_security_group_id" {
+  description = "ID del SG de las Lambdas (modules/iam-lambda-exec.lambda_security_group_id). Se publica como /orion/lambda/security-group-id."
+  type        = string
+  default     = ""
+}
+
+variable "lambda_role_arn" {
+  description = "ARN del IAM execution role (modules/iam-lambda-exec.role_arn). Se publica como /orion/lambda/role-arn. Opcional — los nested stacks de orion-backend pueden usar su propio role."
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Tags adicionales aplicados a todos los recursos del modulo."
   type        = map(string)

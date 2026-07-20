@@ -23,10 +23,38 @@ output "cors_allowed_origins_value" {
   value       = aws_ssm_parameter.cors_allowed_origins.value
 }
 
+output "lambda_vpc_subnet_ids_param_name" {
+  description = "Path del SSM param con VPC subnet IDs (comma-separated). Null si no se proveyeron subnets."
+  value       = try(aws_ssm_parameter.lambda_vpc_subnet_ids[0].name, null)
+}
+
+output "lambda_vpc_subnet_ids_value" {
+  description = "Valor del SSM param con VPC subnet IDs (comma-separated)."
+  value       = try(aws_ssm_parameter.lambda_vpc_subnet_ids[0].value, null)
+}
+
+output "lambda_security_group_id_param_name" {
+  description = "Path del SSM param con Lambda SG ID. Null si no se proveyo SG."
+  value       = try(aws_ssm_parameter.lambda_security_group_id[0].name, null)
+}
+
+output "lambda_security_group_id_value" {
+  description = "Valor del SSM param con Lambda SG ID."
+  value       = try(aws_ssm_parameter.lambda_security_group_id[0].value, null)
+}
+
+output "lambda_role_arn_param_name" {
+  description = "Path del SSM param con Lambda role ARN. Null si no se proveyo role."
+  value       = try(aws_ssm_parameter.lambda_role_arn[0].name, null)
+}
+
 output "created_parameter_names" {
   description = "Lista de paths de SSM params efectivamente creados (util para wiring con policies IAM)."
   value = concat(
     [for p in aws_ssm_parameter.optional_arn : p.name],
     [aws_ssm_parameter.cors_allowed_origins.name],
+    [for p in aws_ssm_parameter.lambda_vpc_subnet_ids : p.name],
+    [for p in aws_ssm_parameter.lambda_security_group_id : p.name],
+    [for p in aws_ssm_parameter.lambda_role_arn : p.name],
   )
 }

@@ -52,6 +52,11 @@ locals {
     "/orion/db/secret-arn"       = var.db_secret_arn
     "/orion/eventbridge/bus-arn" = var.eventbridge_bus_arn
   }
+
+  # Lambda VPC config (publishes both subnets and SG to SSM so orion-backend
+  # can fetch via SAM parameter-overrides-json).
+  has_lambda_vpc     = length(var.lambda_subnet_ids) > 0
+  lambda_subnets_csv = join(",", var.lambda_subnet_ids)
 }
 
 ###############################################################################
@@ -79,6 +84,50 @@ resource "aws_ssm_parameter" "cors_allowed_origins" {
   type        = "SecureString"
   key_id      = "alias/aws/ssm"
   value       = local.cors_origins_json
+
+  tags = local.common_tags
+}
+
+###############################################################################
+# Lambda VPC config — SSM-published values for orion-backend SAM deploy.
+# -----------------------------------------------------------------------------
+# orion-backend deploy.yml fetchea estos valores via aws ssm get-parameter
+# y los pasa al recipe `sam-deploy.yml` via parameter-overrides-json.
+# Asi los nested stacks (authorizer, identity, census) reciben
+# VpcSubnetIds + LambdaSecurityGroupId como SAM Parameters.
+###############################################################################
+resource "aws_ssm_parameter" "lambda_vpc_subnet_ids" {
+  count = local.has_lambda_vpc ? 1 : 0
+
+  # checkov:skip=CKV2_AWS_34:Subnet IDs son public resource identifiers (no secretos). String type OK.
+  name        = "/orion/lambda/vpc-subnet-ids"
+  description = "Comma-separated private subnet IDs donde se ejecutan las Lambdas ORION (de modules/network.private_subnet_ids). Pasado al SAM deploy via parameter-overrides-json."
+  type        = "String"
+  value       = local.lambda_subnets_csv
+
+  tags = local.common_tags
+}
+
+resource "aws_ssm_parameter" "lambda_security_group_id" {
+  count = var.lambda_security_group_id == "" ? 0 : 1
+
+  # checkov:skip=CKV2_AWS_34:SG ID es public resource identifier (no secreto). String type OK.
+  name        = "/orion/lambda/security-group-id"
+  description = "ID del SG dedicado de las Lambdas ORION (modules/iam-lambda-exec.lambda_security_group_id). Usado en AWS::Serverless::Function VpcConfig.SecurityGroupIds."
+  type        = "String"
+  value       = var.lambda_security_group_id
+
+  tags = local.common_tags
+}
+
+resource "aws_ssm_parameter" "lambda_role_arn" {
+  count = var.lambda_role_arn == "" ? 0 : 1
+
+  # checkov:skip=CKV2_AWS_34:Role ARN es IAM resource identifier (no secreto). String type OK.
+  name        = "/orion/lambda/role-arn"
+  description = "ARN del IAM execution role centralizado (modules/iam-lambda-exec). Opcional; los nested stacks de orion-backend usan roles per-context por default."
+  type        = "String"
+  value       = var.lambda_role_arn
 
   tags = local.common_tags
 }

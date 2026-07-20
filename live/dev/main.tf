@@ -206,5 +206,14 @@ module "ssm_bootstrap" {
     "https://orion.dev",
   ]
 
+  # Lambda VPC config para orion-backend SAM deploy:
+  # - lambda_subnet_ids: comma-separated list de subnet IDs privadas.
+  # - lambda_security_group_id: SG ID de las Lambdas (modules/iam-lambda-exec).
+  # orion-backend deploy.yml leera estos valores y los pasara al SAM
+  # reusable workflow como parameter-overrides-json.
+  lambda_subnet_ids        = module.network.private_subnet_ids
+  lambda_security_group_id = module.iam_lambda_exec.lambda_security_group_id
+  lambda_role_arn          = module.iam_lambda_exec.role_arn
+
   tags = local.common_tags
 }
