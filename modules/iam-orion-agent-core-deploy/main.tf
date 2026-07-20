@@ -65,15 +65,27 @@ data "aws_iam_policy_document" "orion_agent_core_deploy_inline" {
   # checkov:skip=CKV_AWS_290:El sub claim restringe el flujo a GitHub OIDC main branch, sin acceso publico.
   # checkov:skip=CKV_AWS_355:Project tag propagado a todos los recursos via default_tags del provider.
   # checkov:skip=CKV_AWS_356:Las acciones con Resource: * son: ecr:GetAuthorizationToken (requerido por AWS como API global de single-account), bedrock-agentcore control plane (Create/Update/Delete/Describe/List) y bedrock:InvokeModel/Converse — todas son acciones API-level no restrictable por recurso individual. Scope por proyecto se enforce via condition aws:ResourceTag/Project + OIDC sub claim.
-  # ECR pull sobre el repo del agent (image-based AgentCore deployments).
+  # ECR pull + push sobre el repo del agent (image-based AgentCore
+  # deployments). Las acciones push son necesarias para que el CD
+  # workflow pueda construir y subir imagenes via docker/build-push-action.
+  # Las acciones pull las usa Bedrock AgentCore para validar y descargar
+  # la imagen durante CreateAgentRuntime.
   statement {
-    sid    = "ECRPullAgentImages"
+    sid    = "ECRAgentImages"
     effect = "Allow"
     actions = [
+      # Pull (Bedrock AgentCore consume la imagen).
       "ecr:GetDownloadUrlForLayer",
       "ecr:BatchGetImage",
       "ecr:BatchCheckLayerAvailability",
       "ecr:DescribeRepositories",
+      "ecr:DescribeImages",
+      # Push (CD workflow sube imagenes via docker push).
+      "ecr:InitiateLayerUpload",
+      "ecr:UploadLayerPart",
+      "ecr:CompleteLayerUpload",
+      "ecr:PutImage",
+      "ecr:TagResource",
     ]
     resources = [var.ecr_repository_arn]
   }
