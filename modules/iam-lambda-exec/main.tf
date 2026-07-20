@@ -35,11 +35,9 @@ locals {
     }
   )
 
-  has_secrets       = length(var.secret_arns) > 0
   has_ssm_params    = length(var.ssm_parameter_arns) > 0
   has_eventbridge   = var.eventbridge_bus_arn != ""
-  has_rds_db        = var.rds_db_resource_arn != ""
-  has_inline_policy = local.has_secrets || local.has_ssm_params || local.has_eventbridge || local.has_rds_db
+  has_inline_policy = local.has_ssm_params || local.has_eventbridge || var.secretsmanager_tag_condition
 }
 
 ###############################################################################
@@ -98,16 +96,30 @@ resource "aws_iam_role_policy_attachment" "xray_execution" {
 # checkov:skip=CKV_AWS_290:Cross-AWS-API actions necesarias para el runtime Lambda (SM + SSM + EB); cada una scope-restricted al ARN correspondiente.
 data "aws_iam_policy_document" "lambda_inline" {
   dynamic "statement" {
-    for_each = local.has_secrets ? [1] : []
+    for_each = var.secretsmanager_tag_condition ? [1] : []
 
     content {
-      sid    = "SecretsManagerRead"
+      sid    = "SecretsManagerReadByProjectTag"
       effect = "Allow"
       actions = [
         "secretsmanager:GetSecretValue",
         "secretsmanager:DescribeSecret",
       ]
-      resources = var.secret_arns
+      resources = ["*"]
+
+      # checkov:skip=CKV_AWS_356:Action especifico (GetSecretValue); tag condition scope-restriction reemplaza ARN explicito (cycle-avoidance).
+      # checkov:skip=CKV_AWS_290:Tag condition (Project=orion) limita acceso a secrets del proyecto via aws:ResourceTag.
+      condition {
+        test     = "StringEquals"
+        variable = "aws:ResourceTag/Project"
+        values   = [var.project_name]
+      }
+
+      condition {
+        test     = "StringEquals"
+        variable = "aws:ResourceTag/ManagedBy"
+        values   = ["terraform"]
+      }
     }
   }
 
@@ -130,17 +142,6 @@ data "aws_iam_policy_document" "lambda_inline" {
       effect    = "Allow"
       actions   = ["events:PutEvents"]
       resources = [var.eventbridge_bus_arn]
-    }
-  }
-
-  dynamic "statement" {
-    for_each = local.has_rds_db ? [1] : []
-
-    content {
-      sid       = "RDSConnect"
-      effect    = "Allow"
-      actions   = ["rds-db:connect"]
-      resources = [var.rds_db_resource_arn]
     }
   }
 }

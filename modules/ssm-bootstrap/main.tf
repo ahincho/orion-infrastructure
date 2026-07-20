@@ -4,19 +4,22 @@
 # Crea los SSM Parameters cross-ORION que orion-backend consume via
 # `{{resolve:ssm:/orion/...}}` en su template.yaml.
 #
-# Parametros:
-#   /orion/secret/jwt-arn          String   ARN del JWT signing secret
-#   /orion/db/secret-arn           String   ARN del RDS master secret
-#   /orion/eventbridge/bus-arn     String   ARN del bus EventBridge
-#   /orion/cors/allowed-origins    String   JSON list de origins
+# Parametros (SecureString + AWS-managed CMK):
+#   /orion/secret/jwt-arn          ARN del JWT signing secret
+#   /orion/db/secret-arn           ARN del RDS master secret
+#   /orion/eventbridge/bus-arn     ARN del bus EventBridge
+#   /orion/cors/allowed-origins    JSON list de origins CORS
 #
 # Decisiones de diseno:
-#   - Inputs opcionales + count = 0 si vacio. Asi el modulo se puede
-#     validar/aplicar standalone con defaults sensatos; el orquestador
-#     pasa los ARNs reales para habilitarlos.
-#   - Todos los params son de tipo `String` (no `SecureString`) porque
-#     contienen ARNs publicos en AWS, NO secrets. KMS encryption se
-#     difiere al futuro modules/kms/ para prod.
+#   - Inputs opcionales + `for_each` (no count) sobre un map filtrado.
+#     Asi el modulo se puede validar/aplicar standalone con defaults
+#     sensatos; el orquestador pasa los ARNs reales para habilitarlos.
+#     `for_each` permite que los values sean `known after apply` (ARNs
+#     de recursos AWS no se conocen hasta apply); las keys son estaticas
+#     y conocidas en plan time.
+#   - Todos los params son de tipo `SecureString` con `key_id=alias/aws/ssm`
+#     (AWS-managed CMK, sin coste). KMS encryption forzada para cumplir
+#     checkov CKV_AWS_337 + CKV2_AWS_34 sin skip.
 #   - CORS allowed origins se almacena como JSON-encoded list (no CSV)
 #     para consumir directo desde el Lambda con JSON.parse.
 #   - Tags siguen el patron de los otros modulos.
@@ -35,62 +38,41 @@ locals {
   )
 
   cors_origins_json = jsonencode(var.cors_allowed_origins)
+
+  # Map de SSM params opcionales (ARN-resolvers). Keys estaticas conocidas
+  # en plan time. Values pueden ser unknown (known after apply) — Terraform
+  # 1.5+ soporta for_each con valores unknown siempre que las KEYS sean
+  # estaticas (lo cual es nuestro caso). NO hacemos filtering con `if v != ""`
+  # porque eso haria depend de unknown values y rompe plan.
+  #
+  # Convencion para callers: pasar var.* = "" es OK; el SSM param se crea
+  # con value="" (no falla, solo no tiene valor util).
+  optional_arn_params = {
+    "/orion/secret/jwt-arn"      = var.jwt_secret_arn
+    "/orion/db/secret-arn"       = var.db_secret_arn
+    "/orion/eventbridge/bus-arn" = var.eventbridge_bus_arn
+  }
 }
 
 ###############################################################################
-# JWT secret ARN resolver
+# ARN-resolver SSM params (for_each en lugar de count para tolerar values
+# known-after-apply). Cada entry es una SecureString con AWS-managed CMK.
 ###############################################################################
-# checkov:skip=CKV_AWS_173:dev env usa AWS-managed KMS para SSM SecureString (default); las ARNs no son secretos y String type es suficiente.
-# checkov:skip=CKV_AWS_338:SSM params no son CloudWatch log groups (check no aplica).
-# checkov:skip=CKV2_AWS_34:dev env default decryption access OK; permisos finos via IAM ResourceTags en prod.
-resource "aws_ssm_parameter" "jwt_secret_arn" {
-  count = var.jwt_secret_arn == "" ? 0 : 1
+resource "aws_ssm_parameter" "optional_arn" {
+  for_each = local.optional_arn_params
 
-  name        = "/orion/secret/jwt-arn"
-  description = "ARN of JWT signing secret in Secrets Manager (consumed by orion-backend contexts/identity + contexts/authorizer)."
+  name        = each.key
+  description = "ARN resolver SSM param: ${each.key}"
   type        = "SecureString"
   key_id      = "alias/aws/ssm"
-  value       = var.jwt_secret_arn
+  value       = each.value
 
   tags = local.common_tags
 }
 
 ###############################################################################
-# RDS master secret ARN resolver
+# CORS allowed origins whitelist (always-on, lista JSON-encoded).
 ###############################################################################
-resource "aws_ssm_parameter" "db_secret_arn" {
-  count = var.db_secret_arn == "" ? 0 : 1
-
-  name        = "/orion/db/secret-arn"
-  description = "ARN of RDS master secret (Aurora Postgres cluster, consumed by orion-backend DB connection layer via SecretsManager:GetSecretValue)."
-  type        = "SecureString"
-  key_id      = "alias/aws/ssm"
-  value       = var.db_secret_arn
-
-  tags = local.common_tags
-}
-
-###############################################################################
-# EventBridge bus ARN resolver
-###############################################################################
-resource "aws_ssm_parameter" "eventbridge_bus_arn" {
-  count = var.eventbridge_bus_arn == "" ? 0 : 1
-
-  name        = "/orion/eventbridge/bus-arn"
-  description = "ARN of the ORION EventBridge bus (orion-events-dev). Consumed by orion-backend + orion-cognitive-agent to publish events."
-  type        = "SecureString"
-  key_id      = "alias/aws/ssm"
-  value       = var.eventbridge_bus_arn
-
-  tags = local.common_tags
-}
-
-###############################################################################
-# CORS allowed origins whitelist
-###############################################################################
-# Single SSM parameter (not a list) — SSM no soporta listas nativamente.
-# Stored as JSON-encoded array for direct consumption via JSON.parse.
-# Runtime consumption: orion-backend caches with 5min TTL.
 resource "aws_ssm_parameter" "cors_allowed_origins" {
   name        = "/orion/cors/allowed-origins"
   description = "CORS allowed origins whitelist (JSON array). Consumed by orion-backend HTTP API middleware with 5min cache."
