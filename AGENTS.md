@@ -164,7 +164,7 @@ Modulos en `modules/` que provisionan recursos consumidos por
 | `modules/ecr-orion-agent-core` | ECR repo privado (`<project>-agent-core-<env>`) AES256 + scan_on_push + lifecycle policy | Deploy job + AgentCore Runtime execution role (pull imagen) |
 | `modules/iam-orion-agent-core-deploy` | GitHub OIDC role (`<project>-agent-core-deploy-<env>`) con permisos granulares sobre AgentCore + Bedrock + ECR | Repo `ahincho/orion-cognitive-agent` (workflows en main branch) |
 | `modules/iam-orion-agent-core-runtime` | IAM role asumido por el contenedor dentro de Bedrock AgentCore (`<project>-agent-core-runtime-<env>`) con permisos Bedrock InvokeModel + CloudWatch logs | Bedrock AgentCore Runtime (trust `bedrock-agentcore.amazonaws.com`) |
-| `modules/bedrock-agent-core-runtime` *(futuro, PR #45)* | `aws_bedrockagentcore_agent_runtime` + `aws_bedrockagentcore_agent_runtime_endpoint` | Bedrock AgentCore Runtime (deploys subsecuentes) |
+| `modules/bedrock-agent-core-runtime` | `aws_bedrockagentcore_agent_runtime` + `aws_bedrockagentcore_agent_runtime_endpoint` (network_mode=PUBLIC, container_uri ECR `<project>-agent-core-<env>:<tag>`) | Bedrock AgentCore Runtime (deploys subsecuentes) |
 
 Wire up al wiring de `live/dev/main.tf` (despues del modulo `ssm-bootstrap`):
 

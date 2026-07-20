@@ -230,3 +230,28 @@ output "orion_agent_core_runtime_role_name" {
   description = "Nombre (sin ARN) del IAM runtime execution role."
   value       = module.iam_orion_agent_core_runtime.runtime_role_name
 }
+
+output "orion_agent_core_runtime_id" {
+  description = "ID del Bedrock AgentCore Runtime."
+  value       = module.bedrock_agent_core_runtime.agent_runtime_id
+}
+
+output "orion_agent_core_runtime_arn" {
+  description = "ARN del Bedrock AgentCore Runtime. Tras el primer `terraform apply`, copiar este valor al param `runtime_arn` del modulo `iam-orion-agent-core-runtime` (PR #44 2-fases bootstrap, fase 2) para tightens la trust policy con aws:SourceArn."
+  value       = module.bedrock_agent_core_runtime.agent_runtime_arn
+}
+
+output "orion_agent_core_runtime_version" {
+  description = "Version del Runtime (autoincrementa con cada Update). Se puede referenciar en el workflow de deploy para rolling update."
+  value       = module.bedrock_agent_core_runtime.agent_runtime_version
+}
+
+output "orion_agent_core_runtime_endpoint_arn" {
+  description = "ARN del Endpoint (alias). URL SigV4: https://bedrock-agentcore.us-east-1.amazonaws.com/runtimes/<endpoint_arn>/invocations."
+  value       = module.bedrock_agent_core_runtime.endpoint_arn
+}
+
+output "orion_agent_core_runtime_endpoint_name" {
+  description = "Nombre del Endpoint (alias)."
+  value       = module.bedrock_agent_core_runtime.endpoint_name
+}

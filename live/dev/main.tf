@@ -229,11 +229,11 @@ module "ssm_bootstrap" {
 # - module.iam_orion_agent_core_runtime: role asumido por el contenedor
 #   dentro del AgentCore Runtime (PR #44). Permisos minimos: Bedrock
 #   InvokeModel + CloudWatch logs sobre /aws/bedrock-agentcore/*.
+# - module.bedrock_agent_core_runtime: aws_bedrockagentcore_agent_runtime
+#   + aws_bedrockagentcore_agent_runtime_endpoint (este PR).
 # - aws_ecr_repository_policy.orion_agent_core: otorga pull al deploy role +
 #   al runtime role. Definido en live/dev (no en el modulo) para evitar cycle
-#   entre los 3 modulos.
-# - (futuro) module.bedrock_agent_core_runtime: aws_bedrockagentcore_agent_runtime
-#   + aws_bedrockagentcore_agent_runtime_endpoint (PR #45).
+#   entre los 4 modulos.
 ###############################################################################
 
 module "ecr_orion_agent_core" {
@@ -285,6 +285,37 @@ module "iam_orion_agent_core_runtime" {
 
   # runtime_arn = "" (default; se actualiza en una PR futura tras crear
   # el AgentRuntime y copiar su ARN aqui).
+
+  tags = local.common_tags
+}
+
+# Bedrock AgentCore Runtime: el recurso aws_bedrockagentcore_agent_runtime +
+# un aws_bedrockagentcore_agent_runtime_endpoint. Publica el contenedor en
+# ECR + lo expone como endpoint invocable por SigV4.
+module "bedrock_agent_core_runtime" {
+  source = "../../modules/bedrock-agent-core-runtime"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  container_uri = "${module.ecr_orion_agent_core.repository_url}:latest"
+  role_arn      = module.iam_orion_agent_core_runtime.runtime_role_arn
+
+  # Defaults del modulo: agent_runtime_name="orion_agent_core_dev",
+  # endpoint_name="dev", network_mode="PUBLIC" (sin coste de VPC endpoints).
+
+  # Env vars inyectadas al contenedor al arrancar. Tipicos:
+  #   - AWS_REGION: provider ya lo inyecta, pero pasamos explicitamente
+  #     para evitar confusion si la app lo lee antes que el SDK.
+  #   - BEDROCK_MODEL_ID: el modelo que el agente invoca via Converse.
+  #   - LOG_LEVEL: standard Python logging level.
+  environment_variables = {
+    AWS_REGION       = "us-east-1"
+    BEDROCK_MODEL_ID = "us.anthropic.claude-sonnet-4-5-20250929" # placeholder; ajustar en el workflow de deploy
+    LOG_LEVEL        = "INFO"
+    ORION_AGENT_NAME = "OrionAgentCore"
+    ORION_AGENT_ENV  = "dev"
+  }
 
   tags = local.common_tags
 }
