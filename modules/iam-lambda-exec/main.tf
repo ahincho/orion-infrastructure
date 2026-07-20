@@ -174,7 +174,6 @@ resource "aws_iam_role_policy" "inline" {
 # checkov:skip=CKV_AWS_277:Lambda SG no requiere ingress rules; API Gateway invoke es a nivel IAM (bypassa SG inbound).
 # checkov:skip=CKV_AWS_24:Lambda SG ingress vacio intencionalmente; SG no es relevante para ingress HTTP (sg es para ENI-level control).
 # checkov:skip=CKV_AWS_260:Lambda SG ingress vacio intencionalmente.
-# checkov:skip=CKV_AWS_382:Segunda regla de egress es 0.0.0.0/0 via NAT para hablar con AWS public APIs (SM/SSM/Logs/ECR/EventBridge/Sts). Trust sigue restringido: el NAT solo enruta trafico originado en el VPC, y la IAM role del Lambda controla que APIs puede invocar. Sin VPC endpoints (drift cleanup) este egress es necesario.
 resource "aws_security_group" "lambda" {
   # checkov:skip=CKV2_AWS_5:Lambda SG se attachea via modules/rds-postgres (allowed_security_group_ids) y via module.iam-lambda-exec direct reuse desde template.yaml + AWS::ApiGatewayV2::Authorizer.
   name_prefix = "${var.project_name}-${var.environment}-lambda-sg-"
@@ -196,6 +195,7 @@ resource "aws_security_group" "lambda" {
   # Trust sigue acotado por la IAM role del Lambda (que APIs puede invocar)
   # y por el NAT (que solo enruta trafico originado en el VPC).
   egress {
+    # checkov:skip=CKV_AWS_382:Egress 0.0.0.0/0 es necesario porque no hay VPC endpoints (drift cleanup) y las Lambdas en subnets privadas solo pueden alcanzar las public AWS APIs via NAT. Trust sigue acotado por la IAM role del Lambda (que APIs puede invocar) y por el NAT (source-NAT, solo enrutado si la trafico se origina en el VPC).
     description = "Allow all egress to public internet via NAT Gateway (SM/SSM/Logs/ECR/EventBridge/Sts public endpoints)."
     from_port   = 0
     to_port     = 0
