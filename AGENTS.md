@@ -1,4 +1,4 @@
-# AGENTS.md
+﻿# AGENTS.md
 
 Convenciones operacionales para el repo `orion-infrastructure`. Lectura
 obligatoria antes de cada PR. Fuente de verdad local (no duplicada en docs/).
@@ -48,18 +48,18 @@ Este repo define la **infraestructura AWS del proyecto**.
   unica var accesible desde ese contexto son las repo-scoped.
 - **Para production en el futuro** se duplica el caller con valores
   hardcoded para prod (`environment: prod`, `backend-bucket: orion-tfstate-prod`,
-  etc.) — o se mantiene el caller y se usa un wrapper distinto. Ver
+  etc.) â€” o se mantiene el caller y se usa un wrapper distinto. Ver
   seccion "Agregar un segundo AWS environment".
 
 ## Branching
 
 ```
 main (protegida, 1 ruleset)
-  â””â”€â”€ feat/<scope>-<name>
-  â””â”€â”€ fix/<scope>-<name>
-  â””â”€â”€ chore/<scope>-<name>
-  â””â”€â”€ docs/<scope>-<name>
-  â””â”€â”€ ci/<scope>-<name>
+  Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ feat/<scope>-<name>
+  Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ fix/<scope>-<name>
+  Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ chore/<scope>-<name>
+  Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ docs/<scope>-<name>
+  Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ ci/<scope>-<name>
 ```
 
 - PR target: `main` directamente (no hay dev intermedia).
@@ -72,15 +72,15 @@ main (protegida, 1 ruleset)
 Pendiente de crear (despues del bootstrap):
 
 - **GitHub Secrets (2):** valores sensibles. Cifrados en reposo.
-  - `AWS_PLAN_ROLE_ARN` — ARN del IAM role `orion-terraform-plan`
+  - `AWS_PLAN_ROLE_ARN` â€” ARN del IAM role `orion-terraform-plan`
     (read-only, asumido por GH Actions en PRs contra `main`).
-  - `AWS_APPLY_ROLE_ARN` — ARN del IAM role `orion-terraform-apply`
+  - `AWS_APPLY_ROLE_ARN` â€” ARN del IAM role `orion-terraform-apply`
     (write, restringido por `aws:RequestedRegion` a `us-east-1`).
 - **GitHub Variable (1):** repo-scoped, no sensible, versionado en
   codigo via `gh variable set`. Ver seccion arriba.
   - `TF_VERSION` = `1.15.7`.
 - **GitHub Environment (1):**
-  - `dev` — branch policy = `main`, sin reviewers, auto-approve=true.
+  - `dev` â€” branch policy = `main`, sin reviewers, auto-approve=true.
 
 El script `scripts/setup-oidc.sh` crea los IAM roles en AWS.
 El script `docs/SETUP.md` documenta los pasos para `gh secret set`.
@@ -92,7 +92,7 @@ El script `docs/SETUP.md` documenta los pasos para `gh secret set`.
    `spark-match-admin`). Si necesitas el Key ID bajo un perfil, usa
    `aws configure get aws_access_key_id --profile <nombre>` en lugar
    de pegarlo en el codigo. **Si una key se filtra al repo por error,
-   rotala inmediatamente en la consola de AWS** — el key ID viejo en
+   rotala inmediatamente en la consola de AWS** â€” el key ID viejo en
    `git log` es entonces texto muerto.
 2. **Nunca** commitear `.tfstate`, `.terraform/`, ni archivos con
    secretos fuera de GH Secrets. `.gitignore` ya los excluye; respeta
@@ -153,8 +153,61 @@ Si mas adelante se quiere producir a production:
 
 Por ahora NO se hace.
 
+
+## orion-cognitive-agent infra (Phase 1.6)
+
+Modulos en `modules/` que provisionan recursos consumidos por
+[`ahincho/orion-cognitive-agent`][cog] (Bedrock AgentCore Runtime deploys):
+
+| Modulo | Recursos | Consumido por |
+|---|---|---|
+| `modules/ecr-orion-agent` | ECR repo privado (`<project>-agent-<env>`) AES256 + scan_on_push + lifecycle policy | Deploy job + AgentCore Runtime execution role (pull imagen) |
+| `modules/iam-orion-agent-dev` | GitHub OIDC role (`<project>-agent-deploy-<env>`) con permisos granulares sobre AgentCore + Bedrock + ECR | Repo `ahincho/orion-cognitive-agent` (workflows en main branch) |
+
+Wire up al wiring de `live/dev/main.tf` (despues del modulo `ssm-bootstrap`):
+
+```hcl
+module "ecr_orion_agent" {
+  source          = "../../modules/ecr-orion-agent"
+  project_name    = var.project_name
+  environment     = var.environment
+  image_tag_mutability = "MUTABLE" # dev only
+  scan_on_push         = true
+  max_image_count      = 20
+  tags                 = local.common_tags
+}
+
+module "iam_orion_agent_dev" {
+  source            = "../../modules/iam-orion-agent-dev"
+  project_name      = var.project_name
+  environment       = var.environment
+  github_repository = "ahincho/orion-cognitive-agent"
+  oidc_provider_arn = module.oidc_github.oidc_provider_arn
+  ecr_repository_arn = module.ecr_orion_agent.repository_arn
+  tags              = local.common_tags
+}
+
+# Cross-cycle resource: el deploy role debe poder pull del ECR repo.
+# Se declara fuera de los modulos para romper el ciclo ecr <-> iam.
+resource "aws_ecr_repository_policy" "orion_agent" {
+  repository = module.ecr_orion_agent.repository_name
+  policy     = jsonencode({ ... })
+}
+```
+
+Outputs en `live/dev/outputs.tf`:
+
+- `orion_agent_deploy_role_arn` -> wire a GitHub Secret `AGENT_DEPLOY_ROLE_ARN` en `orion-cognitive-agent`.
+- `orion_agent_ecr_repository_uri` -> registry URL del ECR repo.
+
+### Ciclo `ecr <-> iam` y como se rompe
+
+1. `iam_orion_agent_dev` necesita `ecr_repository_arn` (input del modulo).
+2. ECR repo policy (`aws_ecr_repository_policy`) necesita permitir pull al deploy role (output del modulo iam).
+3. **Solucion**: el modulo ECR NO acepta `principal_arns_with_pull` por default (queda `[]`). En `live/dev/main.tf` declaramos `aws_ecr_repository_policy.orion_agent` que referencia `module.iam_orion_agent_dev.deploy_role_arn` directamente (fuera del modulo ECR). Asi no hay cycle y la policy es editable sin reemplazar el modulo.
+
+[cog]: https://github.com/ahincho/orion-cognitive-agent
+
 ## Contacto
 
-- Owner: `@ahincho` (solo-dev).
-<!-- trigger ci lint -->
-
+- Owner: `@ahincho` (solo-dev).$
