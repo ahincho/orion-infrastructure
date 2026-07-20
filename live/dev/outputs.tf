@@ -190,33 +190,33 @@ output "ssm_cors_origins_value" {
 }
 
 ###############################################################################
-# Phase 1.6 outputs: Orion Agent infra (Bedrock AgentCore)
+# Phase 1.6 outputs: OrionAgentCore infra (Bedrock AgentCore)
 # -----------------------------------------------------------------------------
 # Consumidos por orion-cognitive-agent via SSM (futuro) o como GitHub Secrets
 # del repo de deploy (inmediato).
 ###############################################################################
 
-output "orion_agent_deploy_role_arn" {
+output "orion_agent_core_deploy_role_arn" {
   description = "ARN del IAM role asumible por GitHub Actions OIDC del repo orion-cognitive-agent para deploys del agent. Wire a GitHub Secret AGENT_DEPLOY_ROLE_ARN."
-  value       = module.iam_orion_agent_dev.deploy_role_arn
+  value       = module.iam_orion_agent_core_deploy.deploy_role_arn
 }
 
-output "orion_agent_deploy_role_name" {
+output "orion_agent_core_deploy_role_name" {
   description = "Nombre (sin ARN) del IAM deploy role."
-  value       = module.iam_orion_agent_dev.deploy_role_name
+  value       = module.iam_orion_agent_core_deploy.deploy_role_name
 }
 
-output "orion_agent_ecr_repository_uri" {
-  description = "Registry URL del ECR repository del agent (e.g. '681526276858.dkr.ecr.us-east-1.amazonaws.com/orion-agent-dev'). Usar en comandos docker push del pipeline."
-  value       = module.ecr_orion_agent.repository_url
+output "orion_agent_core_ecr_repository_uri" {
+  description = "Registry URL del ECR repository del agent (e.g. '681526276858.dkr.ecr.us-east-1.amazonaws.com/orion-agent-core-dev'). Usar en comandos docker push del pipeline."
+  value       = module.ecr_orion_agent_core.repository_url
 }
 
-output "orion_agent_ecr_repository_arn" {
+output "orion_agent_core_ecr_repository_arn" {
   description = "ARN del ECR repository del agent."
-  value       = module.ecr_orion_agent.repository_arn
+  value       = module.ecr_orion_agent_core.repository_arn
 }
 
-output "orion_agent_ecr_repository_name" {
+output "orion_agent_core_ecr_repository_name" {
   description = "Nombre (sin ARN, sin registry URL) del ECR repository del agent."
-  value       = module.ecr_orion_agent.repository_name
+  value       = module.ecr_orion_agent_core.repository_name
 }

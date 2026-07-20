@@ -47,13 +47,13 @@ data "aws_iam_policy_document" "trust" {
 }
 
 ###############################################################################
-# Inline permissions policy para OrionAgentDeploy
+# Inline permissions policy para OrionAgentCoreDeploy
 # -----------------------------------------------------------------------------
 # Permisos esperados por el deploy job de orion-cognitive-agent sobre Bedrock
 # AgentCore Runtime. Mantenido intencionalmente granular: el deploy job nunca
 # toca IAM, KMS ni org-level services, solo AgentCore + ECR + logs + SSM read.
 ###############################################################################
-data "aws_iam_policy_document" "orion_agent_deploy_inline" {
+data "aws_iam_policy_document" "orion_agent_core_deploy_inline" {
   # checkov:skip=CKV_AWS_109:El role es GitHub-OIDC-only con sub claim restringido a ref:refs/heads/main, sin humanos; el codigo del workflow es el unico caller.
   # checkov:skip=CKV_AWS_111:Recursos IAM creados con aws_iam_role + aws_iam_role_policy inline explicitos; no requiere log para operaciones IAM en si.
   # checkov:skip=CKV_AWS_290:El sub claim restringe el flujo a GitHub OIDC main branch, sin acceso publico.
@@ -146,14 +146,14 @@ data "aws_iam_policy_document" "orion_agent_deploy_inline" {
     ]
     resources = [
       for path in [
-        "/orion/agent/runtime-arn",
-        "/orion/agent/endpoint-arn",
+        "/orion/agent-core/runtime-arn",
+        "/orion/agent-core/endpoint-arn",
       ] : "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter${path}"
     ]
   }
 
-  # IAM PassRole: el deploy job puede pasar el AgentCore Runtime execution role
-  # al servicio bedrock-agentcore al crear/actualizar un AgentRuntime.
+  # IAM PassRole: el deploy job puede pasar el OrionAgentCore Runtime execution
+  # role al servicio bedrock-agentcore al crear/actualizar un AgentRuntime.
   dynamic "statement" {
     for_each = length(var.agentcore_runtime_role_arns) > 0 ? [1] : []
     content {
@@ -176,22 +176,23 @@ data "aws_iam_policy_document" "orion_agent_deploy_inline" {
 ###############################################################################
 # Resources
 ###############################################################################
-resource "aws_iam_role" "orion_agent_deploy" {
+resource "aws_iam_role" "orion_agent_core_deploy" {
   # checkov:skip=CKV_AWS_356:El role es GitHub-OIDC-only (asumible solo por el repo caller). Restricciones adicionales (tag conditions, ARN scoping) viven en las inline policy statements, no en la trust policy.
-  name                 = "${var.project_name}-agent-deploy-${var.environment}"
-  description          = "Role asumido por GitHub Actions (OIDC) del repo orion-cognitive-agent para deploys de Bedrock AgentCore Runtime en ${var.environment}."
+  name                 = "${var.project_name}-agent-core-deploy-${var.environment}"
+  description          = "Role asumido por GitHub Actions (OIDC) del repo orion-cognitive-agent para deploys de Bedrock AgentCore Runtime (OrionAgentCore) en ${var.environment}."
   assume_role_policy   = data.aws_iam_policy_document.trust.json
   max_session_duration = 3600 # 1h max (GitHub OIDC sessions son de 60min por defecto).
 
   tags = merge(var.tags, {
-    Name    = "${var.project_name}-agent-deploy-${var.environment}"
-    Purpose = "OrionAgentDeploy"
-    Repo    = var.github_repository
+    Name      = "${var.project_name}-agent-core-deploy-${var.environment}"
+    Purpose   = "OrionAgentCoreDeploy"
+    Component = "iam"
+    Repo      = var.github_repository
   })
 }
 
-resource "aws_iam_role_policy" "orion_agent_deploy_inline" {
-  name   = "${var.project_name}-agent-deploy-${var.environment}-inline"
-  role   = aws_iam_role.orion_agent_deploy.id
-  policy = data.aws_iam_policy_document.orion_agent_deploy_inline.json
+resource "aws_iam_role_policy" "orion_agent_core_deploy_inline" {
+  name   = "${var.project_name}-agent-core-deploy-${var.environment}-inline"
+  role   = aws_iam_role.orion_agent_core_deploy.id
+  policy = data.aws_iam_policy_document.orion_agent_core_deploy_inline.json
 }

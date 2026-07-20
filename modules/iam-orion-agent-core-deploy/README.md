@@ -1,8 +1,8 @@
-# modules/iam-orion-agent-dev
+# modules/iam-orion-agent-core-deploy
 
 IAM role OIDC-asumible por GitHub Actions del repo
 [`ahincho/orion-cognitive-agent`][1] para deploys del runtime de
-Bedrock AgentCore.
+OrionAgentCore (Bedrock AgentCore).
 
 [1]: https://github.com/ahincho/orion-cognitive-agent
 
@@ -10,8 +10,8 @@ Bedrock AgentCore.
 
 | Recurso | Nombre | Proposito |
 |---|---|---|
-| `aws_iam_role` | `<project_name>-agent-deploy-<env>` | Trust OIDC con `repo:ahincho/orion-cognitive-agent:ref:refs/heads/main` |
-| `aws_iam_role_policy` | `<project_name>-agent-deploy-<env>-inline` | Permisos granulares para el deploy del AgentCore Runtime |
+| `aws_iam_role` | `<project_name>-agent-core-deploy-<env>` | Trust OIDC con `repo:ahincho/orion-cognitive-agent:ref:refs/heads/main` |
+| `aws_iam_role_policy` | `<project_name>-agent-core-deploy-<env>-inline` | Permisos granulares para el deploy del AgentCore Runtime |
 
 ## Inputs
 
@@ -19,9 +19,9 @@ Bedrock AgentCore.
 |---|---|---|---|
 | `project_name` | `string` | (requerido) | kebab-case, 3-30 chars. Validado. |
 | `environment` | `string` | (requerido) | `dev`/`staging`/`prod`. Validado. |
-| `github_repository` | `string` | (requerido) | Formato `owner/repo`. Confiar en `token.actions.githubusercontent.com:sub`. |
+| `github_repository` | `string` | `(none)` | Formato `owner/repo`. Default sin valor: el caller debe pasarlo en `live/dev/main.tf`. **Tipico**: `ahincho/orion-cognitive-agent`. |
 | `oidc_provider_arn` | `string` | (requerido) | `module.oidc_github.oidc_provider_arn`. |
-| `ecr_repository_arn` | `string` | (requerido) | `module.ecr_orion_agent.repository_arn`. |
+| `ecr_repository_arn` | `string` | (requerido) | `module.ecr_orion_agent_core.repository_arn`. |
 | `agentcore_runtime_role_arns` | `list(string)` | `[]` | ARNs de Runtime roles (opcional, para `iam:PassRole`). |
 | `tags` | `map(string)` | `{}` | Tags adicionales. |
 
@@ -35,11 +35,11 @@ Bedrock AgentCore.
 
 ## Permisos concedidos
 
-1. **ECR pull + auth** sobre el repo `orion-agent-<env>`.
+1. **ECR pull** + **ECR auth** sobre el repo `orion-agent-core-<env>`.
 2. **Bedrock AgentCore Runtime** (control + data plane, incluye Code Interpreter + Browser si necesarios).
 3. **Bedrock InvokeModel / Converse** (inference en runtime).
 4. **CloudWatch Logs** sobre `/aws/bedrock-agentcore/*`.
-5. **SSM Parameters** `/orion/agent/runtime-arn` + `/orion/agent/endpoint-arn` (lectura).
+5. **SSM Parameters** `/orion/agent-core/runtime-arn` + `/orion/agent-core/endpoint-arn` (lectura).
 6. **IAM PassRole** opcional hacia `bedrock-agentcore.amazonaws.com` (solo si el caller provee `agentcore_runtime_role_arns`).
 
 ## Trust policy
