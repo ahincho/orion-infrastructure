@@ -317,18 +317,22 @@ resource "aws_vpc_endpoint" "s3" {
 }
 
 # Interface VPC endpoints (one per service requested)
+#
+# `vpc_endpoint_services` accepts the AWS service short name (e.g. "ssm",
+# "secretsmanager", "events", "xray"). We expand it into the full
+# `com.amazonaws.<region>.<service>` service name below.
 resource "aws_vpc_endpoint" "interface" {
-  for_each = var.enable_vpc_endpoints ? toset([for s in var.vpc_endpoint_services : format("%s.%s", s, data.aws_region.current.region)]) : toset([])
+  for_each = var.enable_vpc_endpoints ? toset(var.vpc_endpoint_services) : toset([])
 
   vpc_id              = aws_vpc.main.id
-  service_name        = each.value
+  service_name        = "com.amazonaws.${data.aws_region.current.region}.${each.value}"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
   security_group_ids  = [aws_security_group.vpc_endpoints.id]
   private_dns_enabled = true
 
   tags = merge(local.common_tags, {
-    Name = "${var.project_name}-${var.environment}-vpce-${replace(each.key, ".${data.aws_region.current.region}", "")}"
+    Name = "${var.project_name}-${var.environment}-vpce-${each.value}"
   })
 }
 
