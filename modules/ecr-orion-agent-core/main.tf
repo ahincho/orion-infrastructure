@@ -64,6 +64,15 @@ resource "aws_ecr_lifecycle_policy" "agent" {
 ###############################################################################
 
 resource "aws_ecr_repository_policy" "agent" {
+  # Condicional: solo creamos la policy si principal_arns_with_pull no esta
+  # vacio. En live/dev, la policy cross-cycle (deploy + runtime roles) se
+  # declara FUERA de este modulo (resource aws_ecr_repository_policy
+  # .orion_agent_core en live/dev/main.tf) porque depende de outputs de IAM
+  # que rompen el ciclo. Cuando los principals se pasan al modulo, este
+  # resource SI los usa (caso futuro: cuando los outputs IAM sean refactorizados
+  # para no requerir cross-cycle wire).
+  count = length(var.principal_arns_with_pull) > 0 ? 1 : 0
+
   # checkov:skip=CKV_AWS_283:Lista de principals ya esta restringida al caller via var.principal_arns_with_pull (default vacio = repo privado); habilitar cross-account es opt-in explicito.
   repository = aws_ecr_repository.agent.name
   policy = jsonencode({
