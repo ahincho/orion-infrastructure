@@ -331,30 +331,46 @@ module "iam_orion_agent_core_runtime" {
   tags = local.common_tags
 }
 
-# Endurecimiento de la trust policy en 2 fases:
-#   Fase 1 (PR #46): trust loose (cualquier Bedrock AgentCore puede
-#                     assumir el role; util mientras el runtime no existe).
-#   Fase 2 (este PR):  trust endurecido con `aws:SourceArn` igual al
-#                     ARN del runtime concreto creado por Apply 1.
+# Drift detection para la trust policy del IAM role
+# `orion-agent-core-runtime-dev`. Se implementa con un data source sobre
+# el role + un `triggers_replace` en el `terraform_data` que invoca
+# `aws iam update-assume-role-policy`.
 #
-# El endurecimiento se implementa via `aws iam update-assume-role-policy`
-# invocado desde un `terraform_data` con `local-exec`. Esto evita el
-# cycle del Terraform graph (el modulo IAM mantenia sus inputs limpios)
-# y aprovecha el AWS API nativo para update de trust policy in-place
-# (sin recreate role).
+# Problema resuelto: el `terraform_data` original (PR #58) solo re-ejecuta
+# el `local-exec` cuando `input` cambia. El input es el ARN del runtime
+# (constante mientras el runtime exista), asi que cualquier cambio manual
+# a la trust policy en AWS (rollback por bug, click en consola IAM,
+# edicion via SDK ajeno) pasa desapercibido. Esto es drift indetectable.
 #
-# Pattern:
-#   - `terraform_data` re-provisiona cuando `input` cambia.
-#   - `input = module.bedrock_agent_core_runtime.agent_runtime_arn`
-#     (referencia Terraform-graph valida; no hay cycle aqui porque
-#     este data block no participa en el modulo IAM).
-#   - El `local-exec` corre SOLO cuando el apply principal termina.
+# Solucion: `data.aws_iam_role.runtime.assume_role_policy` se evalua en
+# cada refresh/plan. El valor se inyecta en `triggers_replace`:
+#   - Si AWS no cambia: el valor leido == valor en state -> no replace.
+#   - Si AWS cambia (drift): el valor leido != valor en state -> replace
+#     del `terraform_data`, lo cual re-ejecuta el `local-exec` y restaura
+#     la policy endurecida.
+#
+# Detalle de byte representation: AWS IAM API preserva el JSON exacto
+# que se le pasa (`aws iam update-assume-role-policy --policy-document
+# file://...`). El data source `aws_iam_role.assume_role_policy` retorna
+# el mismo string. Verificado empiricamente: tras la primera ejecucion,
+# el read-back coincide con lo escrito y `triggers_replace` queda estable.
 locals {
   runtime_arn_for_trust_policy = module.bedrock_agent_core_runtime.agent_runtime_arn
 }
 
+data "aws_iam_role" "runtime_orion_agent_core" {
+  name = "orion-agent-core-runtime-dev"
+}
+
 resource "terraform_data" "harden_runtime_trust_policy" {
   input = local.runtime_arn_for_trust_policy
+
+  triggers_replace = {
+    # Drift detector: cualquier cambio en AWS dispara re-ejecucion.
+    # Map key es arbitrario; el valor es lo que Terraform compara contra
+    # el valor guardado en state.
+    trust_policy_aws = data.aws_iam_role.runtime_orion_agent_core.assume_role_policy
+  }
 
   provisioner "local-exec" {
     # Force bash explicitly (the default on Windows is cmd.exe, which
