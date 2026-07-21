@@ -52,11 +52,22 @@ resource "aws_bedrockagentcore_agent_runtime" "this" {
 ###############################################################################
 # Endpoint: alias para invocaciones en runtime.
 # Mismas restricciones de RequiresReplace en agent_runtime_id + name.
+#
+# `agent_runtime_version` se referencia al runtime actual para que el endpoint
+# siempre sirva la ultima version. La AWS provider implementa este campo como
+# `update in-place` (verificado con `terraform plan`: `0 add, 1 change,
+# 0 destroy` -> no RequiresReplace real). Cero downtime al bumpear runtime.
+#
+# Trade-off: si se quiere un endpoint pineado a una version estable
+# (rollback-friendly), se debe crear un recurso fuera de este modulo con
+# `agent_runtime_version = "<sha>"` hardcoded. Este modulo expone el
+# patron estandar: track latest.
 ###############################################################################
 resource "aws_bedrockagentcore_agent_runtime_endpoint" "this" {
-  agent_runtime_id = aws_bedrockagentcore_agent_runtime.this.agent_runtime_id
-  name             = var.endpoint_name
-  description      = var.endpoint_description
+  agent_runtime_id      = aws_bedrockagentcore_agent_runtime.this.agent_runtime_id
+  name                  = var.endpoint_name
+  description           = var.endpoint_description
+  agent_runtime_version = aws_bedrockagentcore_agent_runtime.this.agent_runtime_version
 
   tags = merge(var.tags, {
     Name        = "${var.agent_runtime_name}-${var.endpoint_name}"
