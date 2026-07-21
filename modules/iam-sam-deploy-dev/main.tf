@@ -289,15 +289,23 @@ data "aws_iam_policy_document" "orion_sam_deploy_inline" {
       "apigatewayv2:UpdateIntegration",
       "apigatewayv2:DeleteIntegration",
       "apigatewayv2:GetIntegrations",
+      # apigateway:GET is required by CloudFormation to introspect
+      # AWS::ApiGatewayV2::Api resources (e.g. drift detection, GET on
+      # /apis/*/authorizers). apigatewayv2:GetApi alone is not sufficient
+      # when CFN issues the v1 GET API even for v2 resources.
       # apigateway:PATCH is required by CloudFormation to update
       # AWS::ApiGatewayV2::Authorizer resources (e.g. when changing
       # AuthorizerResultTtlInSeconds). apigatewayv2:UpdateAuthorizer alone
       # is not sufficient: CFN issues the v1 PATCH API even for v2 resources.
-      # Without this, sam deploy fails with
-      # "AccessDeniedException ... User ... is not authorized to perform
-      # apigateway:PATCH" on any authorizer update.
+      # apigateway:POST is required by CloudFormation to create
+      # AWS::ApiGatewayV2::Api (and the stage). apigatewayv2:CreateApi
+      # alone is not sufficient: CFN issues the v1 POST API even for v2
+      # resources. Without this, sam deploy fails on a fresh stack with
+      # "AccessDeniedException ... is not authorized to perform:
+      # apigateway:POST on resource: arn:aws:apigateway:us-east-1::/apis".
       "apigateway:GET",
       "apigateway:PATCH",
+      "apigateway:POST",
       "apigatewayv2:CreateStage",
       "apigatewayv2:UpdateStage",
       "apigatewayv2:DeleteStage",
@@ -387,6 +395,24 @@ data "aws_iam_policy_document" "orion_sam_deploy_inline" {
         "events.amazonaws.com",
       ]
     }
+  }
+
+  statement {
+    sid    = "EC2ReadForLambdaVpcConfig"
+    effect = "Allow"
+    actions = [
+      # CloudFormation calls ec2:DescribeSecurityGroups + ec2:DescribeVpcs +
+      # ec2:DescribeSubnets when creating or updating AWS::Lambda::Function
+      # resources with VpcConfig. Without these, sam deploy fails on a fresh
+      # stack with "Your access has been denied by EC2, please make sure
+      # your request credentials have permission to DescribeSecurityGroups
+      # for sg-XXX. EC2 Error Code: UnauthorizedOperation."
+      "ec2:DescribeSecurityGroups",
+      "ec2:DescribeVpcs",
+      "ec2:DescribeSubnets",
+      "ec2:DescribeNetworkInterfaces",
+    ]
+    resources = ["*"]
   }
 
   statement {

@@ -38,7 +38,8 @@ No aceptable desde forks, otras branches, ni el repo spark-match.
 | LambdaReadAll | read-only API global |
 | LambdaManageFunctions | `orion-*-dev` functions + `:*` versions/aliases |
 | LambdaManageLayers | `orion-{node,python}-{shared,runtime}-dev*` |
-| ApiGatewayV2Manage | HTTP API v2 + `apigateway:GET` fallback |
+| ApiGatewayV2Manage | HTTP API v2 + `apigateway:{GET,PATCH,POST}` v1 fallbacks |
+| EC2ReadForLambdaVpcConfig | read-only API global (DescribeSecurityGroups/Vpcs/Subnets/NetworkInterfaces) |
 | EventBridgeManageBusAndRules | rules + bus + archives bajo `orion-*` |
 | IAMManageExecutionRoles | `orion-backend-dev*`, `orion-*-exec-dev`, `orion-lambda-runtime-dev*` |
 | IAMPassRoleToLambdaAndEvents | scoped a `iam:PassedToService in [lambda, apigateway, events]` |
