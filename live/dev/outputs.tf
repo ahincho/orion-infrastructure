@@ -214,7 +214,11 @@ output "api_gateway_id" {
     outputs). Si cambia tras un recreate del stack, terraform apply
     siguiente lo detecta y actualiza el trust policy automaticamente.
   EOT
-  value       = data.aws_ssm_parameter.api_gateway_api_id.value
+  # SSM data sources se marcan sensitive por defecto (pueden contener secretos).
+  # El API ID NO es sensible (visible en consola + URLs), asi que usamos
+  # nonsensitive() para exponerlo en el output. Sin esto, terraform apply
+  # falla con "Output refers to sensitive values".
+  value = nonsensitive(data.aws_ssm_parameter.api_gateway_api_id.value)
 }
 
 ###############################################################################
