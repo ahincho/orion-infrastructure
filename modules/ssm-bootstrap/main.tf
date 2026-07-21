@@ -139,10 +139,15 @@ resource "aws_ssm_parameter" "lambda_role_arn" {
 # `aws ssm get-parameter` y lo pasa como `ApigatewayAuthorizerInvokeRoleArn`
 # al `sam deploy` (template.yaml), evitando hardcodear el ARN en el template
 # y permitiendo que el role sea rotado sin PR a orion-backend.
+#
+# Se crea SIEMPRE (no usamos `count`) porque el input es
+# `module.iam_apigateway_authorizer_invoke.role_arn` que es unknown
+# hasta el primer apply (chicken-and-egg con el role que crea ese modulo).
+# Para los demas params opcionales del modulo (lambda_role_arn, etc.) el
+# caller provee un valor que ya es known (los roles existen), por eso
+# usan `count = ... ? 1 : 0` con normalidad.
 ###############################################################################
 resource "aws_ssm_parameter" "apigateway_authorizer_invoke_role_arn" {
-  count = var.apigateway_authorizer_invoke_role_arn == "" ? 0 : 1
-
   # checkov:skip=CKV2_AWS_34:Role ARN es IAM resource identifier (no secreto). String type OK.
   name        = "/orion/iam/apigateway-authorizer-invoke-role-arn"
   description = "ARN del IAM role que API Gateway ASSUME para invocar el Lambda authorizer (modules/iam-apigateway-authorizer-invoke.role_arn). orion-backend CD - Deploy lo consume como parametro ApigatewayAuthorizerInvokeRoleArn del template.yaml."
