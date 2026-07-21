@@ -104,6 +104,22 @@ El script `docs/SETUP.md` documenta los pasos para `gh secret set`.
    `!*.terraform.lock.hcl`.
 3. **Reglas de branching:** PR a `main` directo, squash-only, branch
    borrada tras merge. NO crear rama `dev/` ni `feature/*` larga vida.
+4. **IAM trust policies para servicios AWS:** antes de modificar la
+   trust policy de un role asumible por `apigateway.amazonaws.com`,
+   `bedrock-agentcore.amazonaws.com`, u otro servicio AWS, **leer**
+   [`docs/adr/0007-api-gateway-authorizer-trust-policy.md`](docs/adr/0007-api-gateway-authorizer-trust-policy.md)
+   (ADR 0007). Caso documentado: AWS NO setea las condition keys
+   `aws:SourceAccount` ni `aws:SourceArn` durante la invocación de
+   Lambda Authorizers via API Gateway — ningún IAM condition key
+   funciona para ese call path (verificado con PRs #73, #75, #76;
+   todos causaron 500 en rutas protegidas y fueron revertidos). La
+   defensa efectiva (misma cuenta, multi-API) es la combinación de:
+   trust policy limitada al service principal + Lambda resource
+   policy `SourceArn` en el invocador + CI gate
+   (`lambda-permission-source-arn` job en orion-backend, PR #104).
+   Cualquier intento futuro de "endurecer" la trust policy debe
+   re-leer el ADR completo y validar empíricamente con `aws sts
+   assume-role` + smoke test antes de mergear.
 
 ## Convenciones Terraform
 
