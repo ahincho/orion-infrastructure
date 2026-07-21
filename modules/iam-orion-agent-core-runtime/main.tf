@@ -116,6 +116,33 @@ data "aws_iam_policy_document" "orion_agent_core_runtime_inline" {
     ]
     resources = ["*"]
   }
+
+  # AWS Marketplace permissions: las invocaciones a modelos de Anthropic (Sonnet /
+  # Haiku / Opus) servidos via Bedrock requieren una suscripcion al marketplace
+  # asociado al modelo. El role de ejecucion del AgentRuntime necesita poder ver
+  # y aceptar la suscripcion la primera vez que se invoca el modelo desde la
+  # cuenta, si AWS no lo ha hecho antes.
+  #
+  # Sintoma observado en dev (2026-07-21): tras submit del Anthropic use case
+  # form, el primer InvokeModel en la cuenta devuelve
+  # `AccessDeniedException: Model access is denied due to IAM user or service
+  # role is not authorized to perform the required AWS Marketplace actions
+  # (aws-marketplace:ViewSubscriptions, aws-marketplace:Subscribe) to enable
+  # access to this model. Your AWS Marketplace subscription for this model
+  # cannot be completed at this time. If you recently fixed this issue, try
+  # again after 2 minutes.` La cuenta aprobo use case pero el role no tiene
+  # permisos para confirmar/visualizar la suscripcion; anadir este statement lo
+  # resuelve.
+  statement {
+    sid    = "AWSMarketplaceSubscriptionForBedrock"
+    effect = "Allow"
+    actions = [
+      "aws-marketplace:ViewSubscriptions",
+      "aws-marketplace:Subscribe",
+      "aws-marketplace:Unsubscribe",
+    ]
+    resources = ["*"]
+  }
 }
 
 ###############################################################################
