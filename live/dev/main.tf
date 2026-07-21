@@ -466,17 +466,26 @@ module "bedrock_agent_core_runtime" {
   # Defaults del modulo: agent_runtime_name="orion_agent_core_dev",
   # endpoint_name="dev", network_mode="PUBLIC" (sin coste de VPC endpoints).
 
-  # Env vars inyectadas al contenedor al arrancar. Tipicos:
-  #   - AWS_REGION: provider ya lo inyecta, pero pasamos explicitamente
-  #     para evitar confusion si la app lo lee antes que el SDK.
-  #   - BEDROCK_MODEL_ID: el modelo que el agente invoca via Converse.
-  #   - LOG_LEVEL: standard Python logging level.
+  # Env vars inyectadas al contenedor al arrancar. Todas las claves
+  # consumidas por Pydantic Settings deben llevar el prefijo ORION_AGENT_
+  # (Settings.env_prefix); LOG_LEVEL/BEDROCK_MODEL_ID sin prefijo NO las
+  # recoge Pydantic pero se mantienen por si la app las lee directo.
+  #
+  # Detalle critico: el AgentCore HTTP protocol contract documenta puerto
+  # 8080 por defecto (no 8000); el Dockerfile de orion-cognitive-agent
+  # define ORION_AGENT_API_PORT=8000 por lo que el contenedor escuchaba
+  # en :8000 -> AWS reenvia POST /invocations a :8080 y la peticion
+  # nunca llega al handler -> 502 tras timeout 60s en cold start. La
+  # override aqui fuerza al contenedor a escuchar en :8080 sin
+  # requerir cambiar el Dockerfile (la override gana al process env).
   environment_variables = {
-    AWS_REGION       = "us-east-1"
-    BEDROCK_MODEL_ID = "us.anthropic.claude-sonnet-4-6" # Sonnet 4.6 (cross-region inference profile, ACTIVE, verificado en dev)
-    LOG_LEVEL        = "INFO"
-    ORION_AGENT_NAME = "OrionAgentCore"
-    ORION_AGENT_ENV  = "dev"
+    AWS_REGION              = "us-east-1"
+    BEDROCK_MODEL_ID        = "us.anthropic.claude-sonnet-4-6" # Sonnet 4.6 (cross-region inference profile, ACTIVE, verificado en dev)
+    LOG_LEVEL               = "INFO"
+    ORION_AGENT_NAME        = "OrionAgentCore"
+    ORION_AGENT_ENVIRONMENT = "agentcore"
+    ORION_AGENT_API_PORT    = "8080" # HTTP protocol contract port (ver AWS docs runtime-service-contract)
+    ORION_AGENT_LOG_LEVEL   = "INFO"
   }
 
   tags = local.common_tags
