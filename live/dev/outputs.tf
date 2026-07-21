@@ -200,25 +200,13 @@ output "apigateway_authorizer_invoke_role_name" {
 
 output "apigateway_authorizer_invoke_trust_policy" {
   description = <<-EOT
-    JSON de la trust policy final aplicada al role (auditoria: debe incluir
-    condicion aws:SourceArn para endurecer contra confusion attacks
-    cross-account; ver modules/iam-apigateway-authorizer-invoke/README.md).
+    JSON de la trust policy final aplicada al role. Solo contiene el
+    service principal \`apigateway.amazonaws.com\`. NO se aniaden
+    aws:SourceAccount ni aws:SourceArn porque AWS API Gateway no setea
+    esas keys para invocaciones de authorizer (regresion observada en
+    PR #73/#75, revertida en #74/#76/#77; ver README del modulo).
   EOT
   value       = module.iam_apigateway_authorizer_invoke.trust_policy
-}
-
-output "api_gateway_id" {
-  description = <<-EOT
-    HTTP API Gateway ID leido de SSM /orion/apigateway/api-id. Orquestado
-    por orion-backend `CD - Deploy` (escribe post-deploy desde CFN stack
-    outputs). Si cambia tras un recreate del stack, terraform apply
-    siguiente lo detecta y actualiza el trust policy automaticamente.
-  EOT
-  # SSM data sources se marcan sensitive por defecto (pueden contener secretos).
-  # El API ID NO es sensible (visible en consola + URLs), asi que usamos
-  # nonsensitive() para exponerlo en el output. Sin esto, terraform apply
-  # falla con "Output refers to sensitive values".
-  value = nonsensitive(data.aws_ssm_parameter.api_gateway_api_id.value)
 }
 
 ###############################################################################
