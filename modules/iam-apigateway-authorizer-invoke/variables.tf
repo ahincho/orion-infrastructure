@@ -33,3 +33,26 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "api_gateway_source_arn" {
+  description = <<-EOT
+    ARN del API Gateway que puede assumir este role. Si se setea (no vacio),
+    la trust policy anade una condicion aws:SourceArn (StringLike) que
+    restringe aun mas quien puede assumir el role (ademas de la condicion
+    aws:SourceAccount que siempre se aplica).
+
+    Tipicamente: arn:aws:execute-api:<region>:<account>:<api-id>/*.
+    Default: "" (no se anade la condicion aws:SourceArn; solo se aplica
+    aws:SourceAccount).
+
+    Usar para endurecer el trust tras crear el API Gateway (patron
+    2-fases: ver AGENTS.md seccion 'iam-orion-agent-core-runtime').
+  EOT
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.api_gateway_source_arn == "" || can(regex("^arn:aws:execute-api:[a-z0-9-]+:[0-9]+:[a-z0-9]+/\\*$", var.api_gateway_source_arn))
+    error_message = "api_gateway_source_arn debe ser vacio o un ARN valido tipo 'arn:aws:execute-api:<region>:<account>:<api-id>/*'."
+  }
+}

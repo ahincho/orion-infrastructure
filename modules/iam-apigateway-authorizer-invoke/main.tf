@@ -37,10 +37,19 @@ locals {
 }
 
 ###############################################################################
+# Current AWS account (usado para la condicion aws:SourceAccount en la trust
+# policy del role). Se resuelve en apply time; el modulo queda reutilizable
+# para futuros environments (staging/prod) sin hardcodear el account ID.
+###############################################################################
+data "aws_caller_identity" "current" {}
+
+###############################################################################
 # IAM Role
 ###############################################################################
-# checkov:skip=CKV_AWS_61:Trust limited to service principal apigateway.amazonaws.com.
-# checkov:skip=CKV_AWS_60:Trust limited to Service principal apigateway (no AWS account access).
+# checkov:skip=CKV_AWS_61:Trust limitado a service principal apigateway.amazonaws.com
+#   + condicion aws:SourceAccount (siempre) + opcional aws:SourceArn si se setea
+#   var.api_gateway_source_arn.
+# checkov:skip=CKV_AWS_60:Trust limitado a Service principal apigateway (no AWS account access).
 data "aws_iam_policy_document" "trust" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -48,6 +57,27 @@ data "aws_iam_policy_document" "trust" {
     principals {
       type        = "Service"
       identifiers = ["apigateway.amazonaws.com"]
+    }
+
+    # aws:SourceAccount siempre se aplica. Bloquea cross-account assume:
+    # incluso si un atacante tiene una API Gateway en otra cuenta AWS, no
+    # puede hacer que essa API invoque nuestro authorizer Lambda.
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+
+    # aws:SourceArn es OPCIONAL (2-fases, ver AGENTS.md). Solo se anade si
+    # var.api_gateway_source_arn esta seteada (no vacia). Patron recomendado
+    # cuando ya se conoce el API ID del API Gateway creado por SAM.
+    dynamic "condition" {
+      for_each = var.api_gateway_source_arn == "" ? [] : [var.api_gateway_source_arn]
+      content {
+        test     = "StringLike"
+        variable = "aws:SourceArn"
+        values   = [condition.value]
+      }
     }
   }
 }
