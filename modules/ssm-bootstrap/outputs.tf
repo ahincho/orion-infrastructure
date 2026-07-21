@@ -49,13 +49,13 @@ output "lambda_role_arn_param_name" {
 }
 
 output "apigateway_authorizer_invoke_role_arn_param_name" {
-  description = "Path del SSM param con API Gateway authorizer invoke role ARN. Null si no se proveyo role."
-  value       = try(aws_ssm_parameter.apigateway_authorizer_invoke_role_arn[0].name, null)
+  description = "Path del SSM param con API Gateway authorizer invoke role ARN (siempre creado cuando el caller provee el valor via var.apigateway_authorizer_invoke_role_arn)."
+  value       = aws_ssm_parameter.apigateway_authorizer_invoke_role_arn.name
 }
 
 output "apigateway_authorizer_invoke_role_arn_value" {
   description = "Valor del SSM param con API Gateway authorizer invoke role ARN."
-  value       = try(aws_ssm_parameter.apigateway_authorizer_invoke_role_arn[0].value, null)
+  value       = aws_ssm_parameter.apigateway_authorizer_invoke_role_arn.value
 }
 
 output "created_parameter_names" {
@@ -66,6 +66,6 @@ output "created_parameter_names" {
     [for p in aws_ssm_parameter.lambda_vpc_subnet_ids : p.name],
     [for p in aws_ssm_parameter.lambda_security_group_id : p.name],
     [for p in aws_ssm_parameter.lambda_role_arn : p.name],
-    [for p in aws_ssm_parameter.apigateway_authorizer_invoke_role_arn : p.name],
+    [aws_ssm_parameter.apigateway_authorizer_invoke_role_arn.name],
   )
 }
