@@ -249,6 +249,53 @@ module "ssm_bootstrap" {
 }
 
 ###############################################################################
+# Phase 2: Angular SPA hosting (orion-frontend)
+# -----------------------------------------------------------------------------
+# Hosting del SPA Angular (orion-frontend) sobre S3 + CloudFront con OAC.
+# Wire:
+#   - module.cloudfront_spa_hosting       S3 privado + CloudFront + OAC + SPA fallback
+#   - module.iam_angular_spa_deploy_dev   IAM role OIDC para el CD del SPA
+#
+# Outputs consumidos por orion-frontend via GH Secrets/Variables:
+#   - cloudfront_spa_hosting.bucket_id         -> GH Variable S3_BUCKET
+#   - cloudfront_spa_hosting.distribution_id   -> GH Variable CLOUDFRONT_DISTRIBUTION_ID
+#   - iam_angular_spa_deploy_dev.role_arn      -> GH Env secret AWS_DEPLOY_ROLE_ARN (env=dev)
+###############################################################################
+
+module "cloudfront_spa_hosting" {
+  source = "../../modules/cloudfront-spa-hosting"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  # bucket_name vacio = default '<project_name>-frontend-<environment>'
+  # = 'orion-frontend-dev'.
+
+  price_class = "PriceClass_100" # dev: US/CA/EU only (mas barato).
+
+  tags = local.common_tags
+}
+
+module "iam_angular_spa_deploy_dev" {
+  source = "../../modules/iam-angular-spa-deploy-dev"
+
+  project_name      = var.project_name
+  environment       = var.environment
+  oidc_provider_arn = module.oidc_github.oidc_provider_arn
+
+  # El repo consumidor de este role. Distinto al repo de infra que provisiona
+  # (orion-infrastructure). Por eso se hardcodea aca y no se reutiliza
+  # var.github_repository (que apunta al repo de infra).
+  github_repository = "ahincho/orion-frontend"
+
+  # ARN patterns derivados del output del modulo cloudfront_spa_hosting.
+  bucket_name                = module.cloudfront_spa_hosting.bucket_id
+  cloudfront_distribution_id = module.cloudfront_spa_hosting.distribution_id
+
+  tags = local.common_tags
+}
+
+###############################################################################
 # Phase 1.6: OrionAgentCore infra (Bedrock AgentCore Runtime deployment)
 # -----------------------------------------------------------------------------
 # - module.ecr_orion_agent_core: ECR repository privado para imagenes del agent.
@@ -331,30 +378,46 @@ module "iam_orion_agent_core_runtime" {
   tags = local.common_tags
 }
 
-# Endurecimiento de la trust policy en 2 fases:
-#   Fase 1 (PR #46): trust loose (cualquier Bedrock AgentCore puede
-#                     assumir el role; util mientras el runtime no existe).
-#   Fase 2 (este PR):  trust endurecido con `aws:SourceArn` igual al
-#                     ARN del runtime concreto creado por Apply 1.
+# Drift detection para la trust policy del IAM role
+# `orion-agent-core-runtime-dev`. Se implementa con un data source sobre
+# el role + un `triggers_replace` en el `terraform_data` que invoca
+# `aws iam update-assume-role-policy`.
 #
-# El endurecimiento se implementa via `aws iam update-assume-role-policy`
-# invocado desde un `terraform_data` con `local-exec`. Esto evita el
-# cycle del Terraform graph (el modulo IAM mantenia sus inputs limpios)
-# y aprovecha el AWS API nativo para update de trust policy in-place
-# (sin recreate role).
+# Problema resuelto: el `terraform_data` original (PR #58) solo re-ejecuta
+# el `local-exec` cuando `input` cambia. El input es el ARN del runtime
+# (constante mientras el runtime exista), asi que cualquier cambio manual
+# a la trust policy en AWS (rollback por bug, click en consola IAM,
+# edicion via SDK ajeno) pasa desapercibido. Esto es drift indetectable.
 #
-# Pattern:
-#   - `terraform_data` re-provisiona cuando `input` cambia.
-#   - `input = module.bedrock_agent_core_runtime.agent_runtime_arn`
-#     (referencia Terraform-graph valida; no hay cycle aqui porque
-#     este data block no participa en el modulo IAM).
-#   - El `local-exec` corre SOLO cuando el apply principal termina.
+# Solucion: `data.aws_iam_role.runtime.assume_role_policy` se evalua en
+# cada refresh/plan. El valor se inyecta en `triggers_replace`:
+#   - Si AWS no cambia: el valor leido == valor en state -> no replace.
+#   - Si AWS cambia (drift): el valor leido != valor en state -> replace
+#     del `terraform_data`, lo cual re-ejecuta el `local-exec` y restaura
+#     la policy endurecida.
+#
+# Detalle de byte representation: AWS IAM API preserva el JSON exacto
+# que se le pasa (`aws iam update-assume-role-policy --policy-document
+# file://...`). El data source `aws_iam_role.assume_role_policy` retorna
+# el mismo string. Verificado empiricamente: tras la primera ejecucion,
+# el read-back coincide con lo escrito y `triggers_replace` queda estable.
 locals {
   runtime_arn_for_trust_policy = module.bedrock_agent_core_runtime.agent_runtime_arn
 }
 
+data "aws_iam_role" "runtime_orion_agent_core" {
+  name = "orion-agent-core-runtime-dev"
+}
+
 resource "terraform_data" "harden_runtime_trust_policy" {
   input = local.runtime_arn_for_trust_policy
+
+  triggers_replace = {
+    # Drift detector: cualquier cambio en AWS dispara re-ejecucion.
+    # Map key es arbitrario; el valor es lo que Terraform compara contra
+    # el valor guardado en state.
+    trust_policy_aws = data.aws_iam_role.runtime_orion_agent_core.assume_role_policy
+  }
 
   provisioner "local-exec" {
     # Force bash explicitly (the default on Windows is cmd.exe, which
@@ -364,7 +427,6 @@ resource "terraform_data" "harden_runtime_trust_policy" {
     command     = <<-EOT
       set -euo pipefail
       tmp="$(mktemp -t orion-trust.XXXXXX.json)"
-      runtime_arn="${local.runtime_arn_for_trust_policy}"
       cat > "$$tmp" <<JSON
       {
         "Version": "2012-10-17",
@@ -375,7 +437,7 @@ resource "terraform_data" "harden_runtime_trust_policy" {
           "Action": "sts:AssumeRole",
           "Condition": {
             "StringEquals": {
-              "aws:SourceArn": "$$runtime_arn"
+              "aws:SourceArn": "${local.runtime_arn_for_trust_policy}"
             }
           }
         }]
@@ -404,17 +466,26 @@ module "bedrock_agent_core_runtime" {
   # Defaults del modulo: agent_runtime_name="orion_agent_core_dev",
   # endpoint_name="dev", network_mode="PUBLIC" (sin coste de VPC endpoints).
 
-  # Env vars inyectadas al contenedor al arrancar. Tipicos:
-  #   - AWS_REGION: provider ya lo inyecta, pero pasamos explicitamente
-  #     para evitar confusion si la app lo lee antes que el SDK.
-  #   - BEDROCK_MODEL_ID: el modelo que el agente invoca via Converse.
-  #   - LOG_LEVEL: standard Python logging level.
+  # Env vars inyectadas al contenedor al arrancar. Todas las claves
+  # consumidas por Pydantic Settings deben llevar el prefijo ORION_AGENT_
+  # (Settings.env_prefix); LOG_LEVEL/BEDROCK_MODEL_ID sin prefijo NO las
+  # recoge Pydantic pero se mantienen por si la app las lee directo.
+  #
+  # Detalle critico: el AgentCore HTTP protocol contract documenta puerto
+  # 8080 por defecto (no 8000); el Dockerfile de orion-cognitive-agent
+  # define ORION_AGENT_API_PORT=8000 por lo que el contenedor escuchaba
+  # en :8000 -> AWS reenvia POST /invocations a :8080 y la peticion
+  # nunca llega al handler -> 502 tras timeout 60s en cold start. La
+  # override aqui fuerza al contenedor a escuchar en :8080 sin
+  # requerir cambiar el Dockerfile (la override gana al process env).
   environment_variables = {
-    AWS_REGION       = "us-east-1"
-    BEDROCK_MODEL_ID = "us.anthropic.claude-sonnet-4-6" # Sonnet 4.6 (cross-region inference profile, ACTIVE, verificado en dev)
-    LOG_LEVEL        = "INFO"
-    ORION_AGENT_NAME = "OrionAgentCore"
-    ORION_AGENT_ENV  = "dev"
+    AWS_REGION              = "us-east-1"
+    BEDROCK_MODEL_ID        = "us.anthropic.claude-sonnet-4-6" # Sonnet 4.6 (cross-region inference profile, ACTIVE, verificado en dev)
+    LOG_LEVEL               = "INFO"
+    ORION_AGENT_NAME        = "OrionAgentCore"
+    ORION_AGENT_ENVIRONMENT = "agentcore"
+    ORION_AGENT_API_PORT    = "8080" # HTTP protocol contract port (ver AWS docs runtime-service-contract)
+    ORION_AGENT_LOG_LEVEL   = "INFO"
   }
 
   tags = local.common_tags

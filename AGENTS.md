@@ -154,6 +154,61 @@ Si mas adelante se quiere producir a production:
 Por ahora NO se hace.
 
 
+## orion-frontend infra (Phase 2)
+
+Hosting del SPA Angular de [`ahincho/orion-frontend`][frontend] sobre
+S3 + CloudFront con Origin Access Control (OAC). Patron recomendado por
+AWS en 2026 (sustituye al legacy OAI).
+
+Modulos en `modules/`:
+
+| Modulo | Recursos | Consumido por |
+|---|---|---|
+| `modules/cloudfront-spa-hosting` | S3 privado (`<project>-frontend-<env>`) AES256 + CloudFront distribution con OAC + SPA fallback (custom_error_response 403/404 -> `/index.html` 200) + managed cache policies (CachingOptimized para default, CachingDisabled para `/index.html`) + Managed-SecurityHeadersPolicy | Workflow `CD - Deploy` de orion-frontend (sync + invalidation) |
+| `modules/iam-angular-spa-deploy-dev` | GitHub OIDC role (`<project>-angular-spa-deploy-<env>`) con permisos S3 (read+write+delete sobre el bucket) + CloudFront create-invalidation sobre el distribution + STS:GetCallerIdentity | Repo `ahincho/orion-frontend` (workflows en main branch) |
+
+Wire up al final de `live/dev/main.tf`:
+
+```hcl
+module "cloudfront_spa_hosting" {
+  source       = "../../modules/cloudfront-spa-hosting"
+  project_name = var.project_name
+  environment  = var.environment
+  price_class  = "PriceClass_100" # dev: US/CA/EU only
+  tags         = local.common_tags
+}
+
+module "iam_angular_spa_deploy_dev" {
+  source                     = "../../modules/iam-angular-spa-deploy-dev"
+  project_name               = var.project_name
+  environment                = var.environment
+  aws_region                 = var.aws_region
+  oidc_provider_arn          = module.oidc_github.oidc_provider_arn
+  github_repository          = "ahincho/orion-frontend" # distinto al repo de infra
+  bucket_name                = module.cloudfront_spa_hosting.bucket_id
+  cloudfront_distribution_id = module.cloudfront_spa_hosting.distribution_id
+  tags                       = local.common_tags
+}
+```
+
+Outputs en `live/dev/outputs.tf`:
+
+- `s3_bucket_name` -> wire a GitHub Variable `S3_BUCKET` (repo-scoped) en orion-frontend.
+- `cloudfront_distribution_id` -> wire a GitHub Variable `CLOUDFRONT_DISTRIBUTION_ID` (repo-scoped).
+- `cloudfront_domain_name` -> URL publica (`dXXXX.cloudfront.net`), referencia.
+- `spa_deploy_role_arn` -> wire a GitHub Environment secret `AWS_DEPLOY_ROLE_ARN` (env: dev) en orion-frontend.
+
+### Decisiones de Phase 2
+
+- **Sin dominio custom ni ACM cert**: la distribution usa `cloudfront_default_certificate = true`. URL publica `*.cloudfront.net`. Migrar a dominio custom es trivial (agregar `acm_certificate_arn` + `aliases` + Route53 alias record).
+- **Sin versionado en el bucket**: `s3 sync --delete` es suficiente; cada deploy sobreescribe. Si en algun momento se quiere rollback via version, activar versioning en el bucket (impacto: ocupa espacio; no free-tier friendly).
+- **CachingDisabled para `/index.html`**: cada deploy se ve al instante sin invalidacion manual. Es seguro porque los chunks referenciados tienen hash en el nombre (output hashing de Angular): si cambia la app, cambia el nombre del chunk y `index.html` apunta al nuevo.
+- **SPA fallback via `custom_error_response`**: no usa Lambda@Edge ni CloudFront Function (costo $0 adicional). Deep links como `/dashboard/algo` cargan `index.html` y el router cliente-side resuelve.
+- **OAC (no OAI)**: AWS deprecO OAI para nuevos deployments. OAC con `signing_behavior = "always"` y `signing_protocol = "sigv4"`.
+- **PriceClass_100 (US/CA/EU only)**: mas barato para dev. Migrar a `PriceClass_All` cuando los usuariosesten fuera de US/CA/EU.
+
+[frontend]: https://github.com/ahincho/orion-frontend
+
 ## orion-cognitive-agent infra (Phase 1.6)
 
 Modulos en `modules/` que provisionan recursos consumidos por

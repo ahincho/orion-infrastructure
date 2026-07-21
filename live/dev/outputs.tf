@@ -273,3 +273,48 @@ output "orion_agent_core_runtime_endpoint_name" {
   description = "Nombre del Endpoint (alias)."
   value       = module.bedrock_agent_core_runtime.endpoint_name
 }
+
+###############################################################################
+# Phase 2 outputs: Angular SPA hosting (orion-frontend)
+# -----------------------------------------------------------------------------
+# Consumidos por orion-frontend via GitHub Secrets / Variables:
+#   - s3_bucket_name               -> GH Variable S3_BUCKET (repo-scoped)
+#   - cloudfront_distribution_id   -> GH Variable CLOUDFRONT_DISTRIBUTION_ID (repo-scoped)
+#   - cloudfront_domain_name       -> URL publica del SPA (referencia)
+#   - spa_deploy_role_arn          -> GH Environment secret AWS_DEPLOY_ROLE_ARN (env=dev)
+###############################################################################
+
+output "s3_bucket_name" {
+  description = "Nombre del bucket S3 del SPA Angular. Wire a GH Variable S3_BUCKET en orion-frontend."
+  value       = module.cloudfront_spa_hosting.bucket_id
+}
+
+output "s3_bucket_arn" {
+  description = "ARN del bucket S3 del SPA Angular."
+  value       = module.cloudfront_spa_hosting.bucket_arn
+}
+
+output "cloudfront_distribution_id" {
+  description = "ID del CloudFront distribution del SPA. Wire a GH Variable CLOUDFRONT_DISTRIBUTION_ID en orion-frontend."
+  value       = module.cloudfront_spa_hosting.distribution_id
+}
+
+output "cloudfront_distribution_arn" {
+  description = "ARN del CloudFront distribution del SPA."
+  value       = module.cloudfront_spa_hosting.distribution_arn
+}
+
+output "cloudfront_domain_name" {
+  description = "URL publica del SPA (e.g. 'd111111abcdef8.cloudfront.net')."
+  value       = module.cloudfront_spa_hosting.distribution_domain_name
+}
+
+output "spa_deploy_role_arn" {
+  description = "ARN del IAM role asumible por GitHub Actions OIDC del repo orion-frontend para deploys del SPA. Wire a GH Environment secret AWS_DEPLOY_ROLE_ARN (env=dev)."
+  value       = module.iam_angular_spa_deploy_dev.role_arn
+}
+
+output "spa_deploy_role_name" {
+  description = "Nombre (sin ARN) del IAM role de deploy del SPA."
+  value       = module.iam_angular_spa_deploy_dev.role_name
+}
