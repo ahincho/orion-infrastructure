@@ -198,6 +198,25 @@ output "apigateway_authorizer_invoke_role_name" {
   value       = module.iam_apigateway_authorizer_invoke.role_name
 }
 
+output "apigateway_authorizer_invoke_trust_policy" {
+  description = <<-EOT
+    JSON de la trust policy final aplicada al role (auditoria: debe incluir
+    condicion aws:SourceArn para endurecer contra confusion attacks
+    cross-account; ver modules/iam-apigateway-authorizer-invoke/README.md).
+  EOT
+  value       = module.iam_apigateway_authorizer_invoke.trust_policy
+}
+
+output "api_gateway_id" {
+  description = <<-EOT
+    HTTP API Gateway ID leido de SSM /orion/apigateway/api-id. Orquestado
+    por orion-backend `CD - Deploy` (escribe post-deploy desde CFN stack
+    outputs). Si cambia tras un recreate del stack, terraform apply
+    siguiente lo detecta y actualiza el trust policy automaticamente.
+  EOT
+  value       = data.aws_ssm_parameter.api_gateway_api_id.value
+}
+
 ###############################################################################
 # Phase 1 outputs: SSM parameter paths (que orion-backend resuelve via {{resolve:ssm:...}})
 ###############################################################################

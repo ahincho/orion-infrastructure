@@ -471,6 +471,22 @@ data "aws_iam_policy_document" "orion_sam_deploy_inline" {
   }
 
   statement {
+    # El rol puede escribir el API ID del stack orion-backend-<env> a SSM
+    # post-deploy (`CD - Deploy` workflow, job deploy-dev). Scope: solo el
+    # param /orion/apigateway/api-id. orion-infrastructure lo lee via
+    # data.aws_ssm_parameter para construir el aws:SourceArn del trust
+    # policy del role assumido por API Gateway.
+    sid    = "SSMWriteApiGatewayApiId"
+    effect = "Allow"
+    actions = [
+      "ssm:PutParameter",
+    ]
+    resources = [
+      "arn:aws:ssm:${local.region}:${local.account_id}:parameter/orion/apigateway/api-id",
+    ]
+  }
+
+  statement {
     sid    = "KMSDecrypt"
     effect = "Allow"
     actions = [
