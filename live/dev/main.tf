@@ -521,8 +521,9 @@ module "bedrock_agent_core_runtime" {
 
   # Env vars inyectadas al contenedor al arrancar. Todas las claves
   # consumidas por Pydantic Settings deben llevar el prefijo ORION_AGENT_
-  # (Settings.env_prefix); LOG_LEVEL/BEDROCK_MODEL_ID sin prefijo NO las
-  # recoge Pydantic pero se mantienen por si la app las lee directo.
+  # (Settings.env_prefix). AWS_REGION queda exenta por convencion del AWS
+  # SDK (boto3 y AgentCore runtime la setean automaticamente; renamearla
+  # rompe las llamadas a servicios AWS).
   #
   # Detalle critico: el AgentCore HTTP protocol contract documenta puerto
   # 8080 por defecto (no 8000); el Dockerfile de orion-cognitive-agent
@@ -533,8 +534,7 @@ module "bedrock_agent_core_runtime" {
   # requerir cambiar el Dockerfile (la override gana al process env).
   environment_variables = {
     AWS_REGION              = "us-east-1"
-    BEDROCK_MODEL_ID        = "us.anthropic.claude-sonnet-4-6" # Sonnet 4.6 (cross-region inference profile, ACTIVE, verificado en dev)
-    LOG_LEVEL               = "INFO"
+    ORION_AGENT_MODEL_ID    = "us.anthropic.claude-sonnet-4-6" # Sonnet 4.6 (cross-region inference profile, ACTIVE, verificado en dev)
     ORION_AGENT_NAME        = "OrionAgentCore"
     ORION_AGENT_ENVIRONMENT = "agentcore"
     ORION_AGENT_API_PORT    = "8080" # HTTP protocol contract port (ver AWS docs runtime-service-contract)
