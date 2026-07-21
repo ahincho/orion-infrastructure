@@ -281,7 +281,6 @@ module "iam_angular_spa_deploy_dev" {
 
   project_name      = var.project_name
   environment       = var.environment
-  aws_region        = var.aws_region
   oidc_provider_arn = module.oidc_github.oidc_provider_arn
 
   # El repo consumidor de este role. Distinto al repo de infra que provisiona
