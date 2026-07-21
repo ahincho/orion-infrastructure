@@ -150,19 +150,17 @@ module "iam_lambda_exec" {
 # (REQUEST type) de orion-backend. Sin este role dedicado, API Gateway
 # devuelve 500 en todas las rutas protegidas.
 #
-# El ARN se expone como output `apigateway_authorizer_invoke_role_arn` y
-# reemplaza al rol legacy `apigateway-authorizer-invoke-role-dev` (creado a
-# mano en el bootstrap inicial, nombre no-conformante con la convencion
-# orion-*).
+# El ARN se publica como SSM param
+# `/orion/iam/apigateway-authorizer-invoke-role-arn` (modules/ssm-bootstrap)
+# y se consume desde el workflow `CD - Deploy` de orion-backend como
+# parametro `ApigatewayAuthorizerInvokeRoleArn` del template.yaml.
 #
-# Plan de migracion del rol legacy (post-merge):
-#   1. terraform apply crea orion-<env>-apigateway-authorizer-invoke-<hash>
-#      (nuevo) SIN eliminar el legacy.
-#   2. Actualizar el parametro `ApigatewayAuthorizerInvokeRoleArn` del
-#      `template.yaml` de orion-backend al nuevo ARN (via PR o parameter
-#      override en deploy.yml con `data.aws_ssm_parameter`).
-#   3. Push vacio para validar CD - Deploy con el nuevo rol.
-#   4. Si pasa: `aws iam delete-role --role-name apigateway-authorizer-invoke-role-dev`.
+# Reemplazo del rol legacy `apigateway-authorizer-invoke-role-dev` (creado a
+# mano durante el bootstrap inicial con nombre no-conformante):
+#   - Terraform: terraform apply (PRs #69, #70, #71 ya merged).
+#   - orion-backend: CD - Deploy ahora lee el nuevo ARN de SSM (PR #99).
+#   - Limpieza: el rol legacy queda sin referencias y se borra manualmente
+#     (post-merge de este PR).
 ###############################################################################
 module "iam_apigateway_authorizer_invoke" {
   source = "../../modules/iam-apigateway-authorizer-invoke"
