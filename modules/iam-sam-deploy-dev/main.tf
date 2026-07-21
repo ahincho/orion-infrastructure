@@ -280,7 +280,15 @@ data "aws_iam_policy_document" "orion_sam_deploy_inline" {
       "apigatewayv2:UpdateIntegration",
       "apigatewayv2:DeleteIntegration",
       "apigatewayv2:GetIntegrations",
+      # apigateway:PATCH is required by CloudFormation to update
+      # AWS::ApiGatewayV2::Authorizer resources (e.g. when changing
+      # AuthorizerResultTtlInSeconds). apigatewayv2:UpdateAuthorizer alone
+      # is not sufficient: CFN issues the v1 PATCH API even for v2 resources.
+      # Without this, sam deploy fails with
+      # "AccessDeniedException ... User ... is not authorized to perform
+      # apigateway:PATCH" on any authorizer update.
       "apigateway:GET",
+      "apigateway:PATCH",
       "apigatewayv2:CreateStage",
       "apigatewayv2:UpdateStage",
       "apigatewayv2:DeleteStage",
