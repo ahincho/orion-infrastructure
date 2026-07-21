@@ -364,7 +364,9 @@ resource "terraform_data" "harden_runtime_trust_policy" {
     command     = <<-EOT
       set -euo pipefail
       tmp="$(mktemp -t orion-trust.XXXXXX.json)"
-      printf '%s' '{
+      runtime_arn="${local.runtime_arn_for_trust_policy}"
+      cat > "$$tmp" <<JSON
+      {
         "Version": "2012-10-17",
         "Statement": [{
           "Sid": "BedrockAgentCoreServiceAssume",
@@ -373,11 +375,12 @@ resource "terraform_data" "harden_runtime_trust_policy" {
           "Action": "sts:AssumeRole",
           "Condition": {
             "StringEquals": {
-              "aws:SourceArn": "${jsonencode(local.runtime_arn_for_trust_policy)}"
+              "aws:SourceArn": "$$runtime_arn"
             }
           }
         }]
-      }' > "$$tmp"
+      }
+      JSON
       aws iam update-assume-role-policy \
         --role-name orion-agent-core-runtime-dev \
         --policy-document "file://$$tmp"
