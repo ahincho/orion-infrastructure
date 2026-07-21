@@ -17,8 +17,10 @@
 #     los functions (least privilege).
 #   - Sin managed policies (no aplica ninguna de las oficiales).
 #   - Sin VPC ni SG (no es necesario; API Gateway invoca por IAM, no por red).
-#   - Naming: <project>-<env>-apigateway-authorizer-invoke-<random> via
-#     name_prefix (igual patron que iam-lambda-exec).
+#   - Naming: <project>-<env>-authorizer-invoke-<random> via
+#     name_prefix (igual patron que iam-lambda-exec). El prefijo se
+#     acorta a "authorizer-invoke" (sin "apigateway-") porque AWS IAM
+#     limita name_prefix a 38 chars (64 - 26 del sufijo aleatorio).
 ###############################################################################
 
 locals {
@@ -51,12 +53,17 @@ data "aws_iam_policy_document" "trust" {
 }
 
 resource "aws_iam_role" "this" {
-  name_prefix          = "${var.project_name}-${var.environment}-apigateway-authorizer-invoke-"
+  # name_prefix <= 38 chars (AWS IAM limit: 64 - 26 suffix). El nombre
+  # completo se forma como `<project>-<env>-authorizer-invoke-<random>`.
+  # Nota: usamos "authorizer-invoke" (no "apigateway-authorizer-invoke")
+  # para mantener el prefijo < 38 chars. El "apigateway" service es
+  # implicito en el trust policy.
+  name_prefix          = "${var.project_name}-${var.environment}-authorizer-invoke-"
   assume_role_policy   = data.aws_iam_policy_document.trust.json
   max_session_duration = 3600
 
   tags = merge(local.common_tags, {
-    Name = "${var.project_name}-${var.environment}-apigateway-authorizer-invoke"
+    Name = "${var.project_name}-${var.environment}-authorizer-invoke"
   })
 }
 
@@ -82,7 +89,7 @@ data "aws_iam_policy_document" "invoke_authorizer" {
 }
 
 resource "aws_iam_role_policy" "inline" {
-  name   = "${var.project_name}-${var.environment}-apigateway-authorizer-invoke-inline"
+  name   = "${var.project_name}-${var.environment}-authorizer-invoke-inline"
   role   = aws_iam_role.this.id
   policy = data.aws_iam_policy_document.invoke_authorizer.json
 }
