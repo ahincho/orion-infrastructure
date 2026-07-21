@@ -319,11 +319,67 @@ module "iam_orion_agent_core_runtime" {
   project_name = var.project_name
   environment  = var.environment
 
-  # Fase 1 (PR #46): sin `runtime_arn` (default ""). Trust loose.
-  # Fase 2 (PR #50, post-primer apply): descomentar y reaplicar:
-  #   runtime_arn = module.bedrock_agent_core_runtime.agent_runtime_arn
+  # Fase 2 (post Apply 1): trust endurecido. Implementado via
+  # `terraform_data` (post-apply `local-exec`) porque el wiring directo
+  # `runtime_arn = module.bedrock_agent_core_runtime.agent_runtime_arn`
+  # introduce un cycle en el graph:
+  #   iam.runtime_arn <-> bedrock_agent_core_runtime.role_arn
+  # El IAM module mantiene `runtime_arn = ""` (default) durante este
+  # PR; el endurecimiento real ocurre en el `terraform_data` mas abajo
+  # via `aws iam update-assume-role-policy` (idempotente, in-place).
 
   tags = local.common_tags
+}
+
+# Endurecimiento de la trust policy en 2 fases:
+#   Fase 1 (PR #46): trust loose (cualquier Bedrock AgentCore puede
+#                     assumir el role; util mientras el runtime no existe).
+#   Fase 2 (este PR):  trust endurecido con `aws:SourceArn` igual al
+#                     ARN del runtime concreto creado por Apply 1.
+#
+# El endurecimiento se implementa via `aws iam update-assume-role-policy`
+# invocado desde un `terraform_data` con `local-exec`. Esto evita el
+# cycle del Terraform graph (el modulo IAM mantenia sus inputs limpios)
+# y aprovecha el AWS API nativo para update de trust policy in-place
+# (sin recreate role).
+#
+# Pattern:
+#   - `terraform_data` re-provisiona cuando `input` cambia.
+#   - `input = module.bedrock_agent_core_runtime.agent_runtime_arn`
+#     (referencia Terraform-graph valida; no hay cycle aqui porque
+#     este data block no participa en el modulo IAM).
+#   - El `local-exec` corre SOLO cuando el apply principal termina.
+locals {
+  runtime_arn_for_trust_policy = module.bedrock_agent_core_runtime.agent_runtime_arn
+}
+
+resource "terraform_data" "harden_runtime_trust_policy" {
+  input = local.runtime_arn_for_trust_policy
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      set -euo pipefail
+      cat > /tmp/orion-agent-core-runtime-trust-policy.json <<JSON
+      {
+        "Version": "2012-10-17",
+        "Statement": [{
+          "Sid": "BedrockAgentCoreServiceAssume",
+          "Effect": "Allow",
+          "Principal": {"Service": "bedrock-agentcore.amazonaws.com"},
+          "Action": "sts:AssumeRole",
+          "Condition": {
+            "StringEquals": {
+              "aws:SourceArn": ${jsonencode(local.runtime_arn_for_trust_policy)}
+            }
+          }
+        }]
+      }
+      JSON
+      aws iam update-assume-role-policy \
+        --role-name orion-agent-core-runtime-dev \
+        --policy-document file:///tmp/orion-agent-core-runtime-trust-policy.json
+    EOT
+  }
 }
 
 # Bedrock AgentCore Runtime: el recurso aws_bedrockagentcore_agent_runtime +
