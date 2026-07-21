@@ -73,9 +73,10 @@ variable "security_groups" {
 }
 
 # Variables de entorno que se pasan al contenedor al arrancar.
-# Tipicos: AWS_REGION, BEDROCK_MODEL_ID, LOG_LEVEL.
+# El agente las consume via Pydantic Settings (env_prefix='ORION_AGENT_');
+# AWS_REGION queda exenta por convencion del AWS SDK.
 variable "environment_variables" {
-  description = "Map de variables de entorno pasadas al contenedor. Típicos: AWS_REGION, BEDROCK_MODEL_ID, LOG_LEVEL, ORION_AGENT_*."
+  description = "Map de variables de entorno pasadas al contenedor. Típicos: AWS_REGION (exenta por SDK AWS), ORION_AGENT_* (consumidas por Pydantic Settings)."
   type        = map(string)
   default     = {}
 }
