@@ -480,13 +480,13 @@ module "bedrock_agent_core_runtime" {
   # override aqui fuerza al contenedor a escuchar en :8080 sin
   # requerir cambiar el Dockerfile (la override gana al process env).
   environment_variables = {
-    AWS_REGION                = "us-east-1"
-    BEDROCK_MODEL_ID          = "us.anthropic.claude-sonnet-4-6" # Sonnet 4.6 (cross-region inference profile, ACTIVE, verificado en dev)
-    LOG_LEVEL                 = "INFO"
-    ORION_AGENT_NAME          = "OrionAgentCore"
-    ORION_AGENT_ENVIRONMENT   = "agentcore"
-    ORION_AGENT_API_PORT      = "8080" # HTTP protocol contract port (ver AWS docs runtime-service-contract)
-    ORION_AGENT_LOG_LEVEL     = "INFO"
+    AWS_REGION              = "us-east-1"
+    BEDROCK_MODEL_ID        = "us.anthropic.claude-sonnet-4-6" # Sonnet 4.6 (cross-region inference profile, ACTIVE, verificado en dev)
+    LOG_LEVEL               = "INFO"
+    ORION_AGENT_NAME        = "OrionAgentCore"
+    ORION_AGENT_ENVIRONMENT = "agentcore"
+    ORION_AGENT_API_PORT    = "8080" # HTTP protocol contract port (ver AWS docs runtime-service-contract)
+    ORION_AGENT_LOG_LEVEL   = "INFO"
   }
 
   tags = local.common_tags
