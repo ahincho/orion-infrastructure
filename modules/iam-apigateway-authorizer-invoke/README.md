@@ -24,10 +24,12 @@ referenciar su ARN via `AuthorizerCredentialsArn` en el `AWS::ApiGatewayV2::Auth
 ## Que hace
 
 - **`aws_iam_role`** `<project>-<env>-authorizer-invoke-<random>` con
-  trust policy: `apigateway.amazonaws.com` (sin condiciones para dev; prod
-  deberia aniadir `aws:SourceAccount` y `aws:SourceArn`). El prefijo se
-  acorta a `authorizer-invoke` (sin `apigateway-`) porque AWS IAM limita
-  `name_prefix` a 38 chars (64 - 26 del sufijo aleatorio).
+  trust policy: `apigateway.amazonaws.com` + condicion
+  `aws:SourceAccount = <this-account>` (siempre, automatico via
+  `data.aws_caller_identity.current`) + condicion opcional `aws:SourceArn`
+  (solo si se setea `var.api_gateway_source_arn`; patron 2-fases, ver
+  AGENTS.md). El prefijo se acorta a `authorizer-invoke` (sin `apigateway-`)
+  porque AWS IAM limita `name_prefix` a 38 chars (64 - 26 del sufijo aleatorio).
 - **1 inline policy**:
   - `lambda:InvokeFunction` sobre `var.authorizer_function_arn` (single-ARN
     scope, no wildcard).
@@ -63,6 +65,7 @@ El output `role_arn` se cablea a `live/dev/outputs.tf` como
 | `project_name` | requerido | kebab-case (3-30). |
 | `environment` | requerido | `dev` \| `staging` \| `prod`. |
 | `authorizer_function_arn` | requerido | ARN del Lambda authorizer (e.g. `orion-authorizer-dev`). |
+| `api_gateway_source_arn` | `""` | (Opcional) ARN del API Gateway que puede assumir el role (e.g. `arn:aws:execute-api:us-east-1:681526276858:0yti3414w0/*`). Si vacio, solo se aplica `aws:SourceAccount`. |
 | `tags` | `{}` | Tags extra. |
 
 ## Outputs
@@ -71,14 +74,22 @@ El output `role_arn` se cablea a `live/dev/outputs.tf` como
 |---|---|
 | `role_arn` | ARN del role. Usar como `AuthorizerCredentialsArn` en SAM. |
 | `role_name`, `role_unique_id` | Identificadores. |
+| `trust_policy` | JSON final de la trust policy aplicada (auditoria). |
 
 ## Decisiones de diseno
 
-- **Trust policy sin condiciones**: para dev. Prod deberia aniadir
-  `aws:SourceAccount = <this-account>` y opcionalmente
-  `aws:SourceArn = arn:aws:execute-api:...:<api-id>/*/*` para evitar
-  confusion attacks (otro API Gateway en la misma cuenta invocando el
-  authorizer con esta role).
+- **Trust policy con condicion `aws:SourceAccount` siempre**: automatico
+  via `data.aws_caller_identity.current.account_id`. Bloquea el riesgo
+  cross-account (un atacante con API Gateway en otra cuenta AWS no puede
+  hacer que su API invoque nuestro authorizer). No requiere conocer el
+  API ID del API Gateway (no chicken-and-egg con SAM).
+- **Trust policy con condicion opcional `aws:SourceArn`**: solo si se
+  setea `var.api_gateway_source_arn`. Patron 2-fases (mismo que
+  `iam-orion-agent-core-runtime`, ver AGENTS.md): en dev se deja vacio
+  porque API Gateway lo crea SAM y Terraform no conoce su ID todavia.
+  Para prod/2da fase, pasar el ARN
+  `arn:aws:execute-api:<region>:<account>:<api-id>/*` como variable
+  (tipicamente resoluble via `data "aws_apigatewayv2_api"` by name).
 - **Sin VPC ni SG**: API Gateway invoca por IAM, no por red. No aplica
   LambdaBasicExecutionRole ni AWSLambdaVPCAccessExecutionRole.
 - **Single-ARN scope en `lambda:InvokeFunction`**: least privilege. NO
@@ -97,7 +108,8 @@ El output `role_arn` se cablea a `live/dev/outputs.tf` como
 
 ## Diferencias para prod (futuro)
 
-- Aniadir condicion `aws:SourceAccount` y `aws:SourceArn` al trust policy
-  (acotar cual API puede assumir el role).
+- Setear `api_gateway_source_arn` para endurecer aun mas el trust con
+  `aws:SourceArn = arn:aws:execute-api:...:<api-id>/*`. Requiere conocer
+  el API ID (resoluble via `data "aws_apigatewayv2_api"` by name).
 - Considerar `max_session_duration = 900` (default 1h es alto para un
   invoke role de corta duracion; minimo 900s segun AWS docs).
