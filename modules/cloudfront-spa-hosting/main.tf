@@ -117,8 +117,6 @@ resource "aws_cloudfront_origin_access_control" "spa" {
 # aws:SourceArn = distribution ARN restringe el acceso a ESTA distribution
 # (defense-in-depth anti confused-deputy: aunque alguien cree otro OAC para
 # este bucket, no podra servir contenido desde el distribution equivocado).
-data "aws_caller_identity" "current" {}
-
 data "aws_iam_policy_document" "spa_bucket" {
   statement {
     sid     = "AllowCloudFrontServiceRead"

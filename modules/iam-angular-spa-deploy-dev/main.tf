@@ -32,7 +32,6 @@ data "aws_caller_identity" "current" {}
 
 locals {
   account_id = data.aws_caller_identity.current.account_id
-  region     = var.aws_region
 
   # S3 ARNs para el bucket del SPA. Scoped al bucket_name especifico
   # (pasado por el caller desde cloudfront-spa-hosting outputs).
