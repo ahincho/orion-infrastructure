@@ -256,6 +256,14 @@ data "aws_iam_policy_document" "orion_sam_deploy_inline" {
       "lambda:CreateAlias",
       "lambda:UpdateAlias",
       "lambda:InvokeFunction",
+      # lambda:TagResource is required by CloudFormation to apply the
+      # default tags (Project=orion, Environment=dev, ManagedBy=terraform,
+      # Repository=ahincho/orion-infrastructure) on every AWS::Lambda::Function
+      # it creates. Without this, sam deploy on a fresh stack fails with
+      # "AccessDeniedException ... is not authorized to perform:
+      # lambda:TagResource on resource: arn:aws:lambda:us-east-1:...:function:orion-*".
+      "lambda:TagResource",
+      "lambda:UntagResource",
     ]
     resources = local.lambda_function_arns
   }
@@ -322,6 +330,15 @@ data "aws_iam_policy_document" "orion_sam_deploy_inline" {
       "apigatewayv2:DeleteAuthorizer",
       "apigatewayv2:AddTagsToResource",
       "apigatewayv2:RemoveTagsFromResource",
+      # apigateway:TagResource is required by CloudFormation to apply the
+      # default tags on AWS::ApiGatewayV2::Stage (and possibly other
+      # resources). apigatewayv2:AddTagsToResource is the v2 action but
+      # CFN issues the v1 apigateway:TagResource API. Without this,
+      # sam deploy on a fresh stack fails with "AccessDeniedException ...
+      # apigateway:TagResource on resource:
+      # arn:aws:apigateway:us-east-1::/apis/<id>/stages".
+      "apigateway:TagResource",
+      "apigateway:UntagResource",
     ]
     resources = ["*"]
   }
