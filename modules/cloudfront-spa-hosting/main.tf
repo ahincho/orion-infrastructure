@@ -52,6 +52,7 @@ resource "aws_s3_bucket" "spa" {
   # checkov:skip=CKV_AWS_144:single-region dev environment; cross-region replication not applicable.
   # checkov:skip=CKV_AWS_145:SSE-S3 AES256 es suficiente para SPA dev; KMS adds complexity without benefit at this stage.
   # checkov:skip=CKV2_AWS_62:SPA bucket no consumer de eventos (no Lambda/SQS/SNS); event notifications no aplican.
+  # checkov:skip=CKV_AWS_21:bucket sin versionado por diseno; cada deploy sobreescribe via `aws s3 sync --delete`. Rollback via versiones no es requisito (deploys son idempotentes y reversibles via redeploy). Versionado ocupa espacio innecesario en dev.
   bucket        = local.bucket_name
   force_destroy = var.environment == "dev" # dev-only: permite `terraform destroy` rapido aunque tenga objetos.
 
@@ -165,6 +166,11 @@ resource "aws_s3_bucket_policy" "spa" {
 resource "aws_cloudfront_distribution" "spa" {
   # checkov:skip=CKV_AWS_68:Origen S3 privado; acceso solo via CloudFront OAC. Log delivery opcional via additional_log.
   # checkov:skip=CKV_AWS_86:Sin dominio custom = no requiere ACM certificate.
+  # checkov:skip=CKV_AWS_174:CloudFront default certificate usa TLSv1.2_2018 minimo (suficiente). Migrar a ACM custom cuando se agregue dominio.
+  # checkov:skip=CKV_AWS_310:SPA single-bucket; origin failover no aplica (no hay origin secundario).
+  # checkov:skip=CKV_AWS_374:SPA dev sin geo restriction; usuarios de cualquier region pueden acceder. Activar geo restriction cuando el producto tenga mercado definido.
+  # checkov:skip=CKV2_AWS_42:CloudFront default certificate (*.cloudfront.net). Custom SSL + ACM requieren dominio custom (futuro).
+  # checkov:skip=CKV2_AWS_47:WAFv2 no necesario en dev (coste $5/mes + reglas). Agregar WAF cuando se exponga a internet publico con usuarios externos.
   comment             = "${local.bucket_name} CDN"
   enabled             = true
   default_root_object = "index.html"
