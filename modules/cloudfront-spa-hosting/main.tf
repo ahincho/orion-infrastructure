@@ -104,11 +104,11 @@ resource "aws_s3_bucket_lifecycle_configuration" "spa" {
 # AWS provider 5.x+ soporta OAC. Sigv4 siempre activo. El bucket policy
 # mas abajo referencia este OAC por ID.
 resource "aws_cloudfront_origin_access_control" "spa" {
-  name             = "${local.bucket_name}-oac"
-  origin_type      = "s3"
-  signing_behavior = "always"
-  signing_protocol = "sigv4"
-  description      = "OAC for SPA bucket ${local.bucket_name}"
+  name                              = "${local.bucket_name}-oac"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+  description                       = "OAC for SPA bucket ${local.bucket_name}"
 }
 
 ###############################################################################
