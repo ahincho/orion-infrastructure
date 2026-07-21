@@ -314,6 +314,14 @@ data "aws_iam_policy_document" "orion_sam_deploy_inline" {
       "apigateway:GET",
       "apigateway:PATCH",
       "apigateway:POST",
+      # apigateway:DELETE is required by CloudFormation to delete the
+      # AWS::ApiGatewayV2::Stage (and the API) on stack teardown.
+      # apigatewayv2:DeleteApi alone is not sufficient: CFN issues the v1
+      # DELETE API even for v2 resources on certain operations. Without
+      # this, sam delete / stack delete fails with
+      # "AccessDeniedException ... apigateway:DELETE on resource:
+      # arn:aws:apigateway:us-east-1::/apis/<id>/stages/<stage>".
+      "apigateway:DELETE",
       "apigatewayv2:CreateStage",
       "apigatewayv2:UpdateStage",
       "apigatewayv2:DeleteStage",
