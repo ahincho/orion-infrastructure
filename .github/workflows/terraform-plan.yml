@@ -25,9 +25,12 @@ on:
     paths:
       - "**.tf"
       - "**.tfvars"
+      - "**.md"
+      - "**.markdown"
       - ".github/workflows/**"
       - "modules/**"
       - "live/**"
+      - "docs/**"
   workflow_dispatch:
 
 permissions:
