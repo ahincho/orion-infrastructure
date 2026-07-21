@@ -24,12 +24,11 @@ referenciar su ARN via `AuthorizerCredentialsArn` en el `AWS::ApiGatewayV2::Auth
 ## Que hace
 
 - **`aws_iam_role`** `<project>-<env>-authorizer-invoke-<random>` con
-  trust policy: `apigateway.amazonaws.com` + condicion
-  `aws:SourceAccount = <this-account>` (siempre, automatico via
-  `data.aws_caller_identity.current`) + condicion opcional `aws:SourceArn`
-  (solo si se setea `var.api_gateway_source_arn`; patron 2-fases, ver
-  AGENTS.md). El prefijo se acorta a `authorizer-invoke` (sin `apigateway-`)
-  porque AWS IAM limita `name_prefix` a 38 chars (64 - 26 del sufijo aleatorio).
+  trust policy: `apigateway.amazonaws.com` + condicion opcional
+  `aws:SourceArn` (solo si se setea `var.api_gateway_source_arn`; patron
+  2-fases, ver AGENTS.md). El prefijo se acorta a `authorizer-invoke`
+  (sin `apigateway-`) porque AWS IAM limita `name_prefix` a 38 chars
+  (64 - 26 del sufijo aleatorio).
 - **1 inline policy**:
   - `lambda:InvokeFunction` sobre `var.authorizer_function_arn` (single-ARN
     scope, no wildcard).
@@ -78,11 +77,14 @@ El output `role_arn` se cablea a `live/dev/outputs.tf` como
 
 ## Decisiones de diseno
 
-- **Trust policy con condicion `aws:SourceAccount` siempre**: automatico
-  via `data.aws_caller_identity.current.account_id`. Bloquea el riesgo
-  cross-account (un atacante con API Gateway en otra cuenta AWS no puede
-  hacer que su API invoque nuestro authorizer). No requiere conocer el
-  API ID del API Gateway (no chicken-and-egg con SAM).
+- **Trust policy SIN condicion `aws:SourceAccount` por defecto**: aunque
+  en teoria deberia bloquear el riesgo cross-account, en la practica
+  rompe el flujo. API Gateway NO setea la condition key `aws:SourceAccount`
+  cuando invoca un authorizer Lambda (a diferencia de otros servicios
+  como S3 o Lambda). Anadir la condicion causa 500 Internal Server Error
+  en todas las rutas protegidas (regresion observada y revertida en
+  PR #73 -> #74). Si AWS anade soporte en el futuro, reintroducir detras
+  de un flag.
 - **Trust policy con condicion opcional `aws:SourceArn`**: solo si se
   setea `var.api_gateway_source_arn`. Patron 2-fases (mismo que
   `iam-orion-agent-core-runtime`, ver AGENTS.md): en dev se deja vacio
@@ -108,7 +110,9 @@ El output `role_arn` se cablea a `live/dev/outputs.tf` como
 
 ## Diferencias para prod (futuro)
 
-- Setear `api_gateway_source_arn` para endurecer aun mas el trust con
+- Re-evaluar `aws:SourceAccount` si AWS anade soporte (monitorear AWS
+  announcements / docs de API Gateway v2 trust policies).
+- Setear `api_gateway_source_arn` para endurecer el trust con
   `aws:SourceArn = arn:aws:execute-api:...:<api-id>/*`. Requiere conocer
   el API ID (resoluble via `data "aws_apigatewayv2_api"` by name).
 - Considerar `max_session_duration = 900` (default 1h es alto para un
