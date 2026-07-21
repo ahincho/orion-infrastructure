@@ -364,7 +364,6 @@ resource "terraform_data" "harden_runtime_trust_policy" {
     command     = <<-EOT
       set -euo pipefail
       tmp="$(mktemp -t orion-trust.XXXXXX.json)"
-      runtime_arn="${local.runtime_arn_for_trust_policy}"
       cat > "$$tmp" <<JSON
       {
         "Version": "2012-10-17",
@@ -375,7 +374,7 @@ resource "terraform_data" "harden_runtime_trust_policy" {
           "Action": "sts:AssumeRole",
           "Condition": {
             "StringEquals": {
-              "aws:SourceArn": "$$runtime_arn"
+              "aws:SourceArn": "${local.runtime_arn_for_trust_policy}"
             }
           }
         }]
