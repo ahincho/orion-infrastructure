@@ -57,7 +57,7 @@ module "iam_angular_spa_deploy_dev" {
   source                     = "../../modules/iam-angular-spa-deploy-dev"
   project_name               = var.project_name
   environment                = var.environment
-  aws_region                 = var.aws_region
+  aws_region                 = var.aws_region  # legacy: kept as comment for context, var was dropped
   oidc_provider_arn          = module.oidc_github.oidc_provider_arn
   github_repository          = "ahincho/orion-frontend"
   bucket_name                = module.cloudfront_spa_hosting.bucket_id

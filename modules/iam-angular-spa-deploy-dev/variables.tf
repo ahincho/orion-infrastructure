@@ -18,16 +18,6 @@ variable "environment" {
   }
 }
 
-variable "aws_region" {
-  description = "Region AWS donde se deployan los recursos (para construir ARN templates)."
-  type        = string
-
-  validation {
-    condition     = can(regex("^[a-z]{2}-[a-z]+-[0-9]$", var.aws_region))
-    error_message = "aws_region debe tener formato like 'us-east-1'."
-  }
-}
-
 variable "oidc_provider_arn" {
   description = "ARN del IAM OIDC provider creado por modules/oidc-github. Tipicamente module.oidc_github.oidc_provider_arn."
   type        = string
