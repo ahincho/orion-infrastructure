@@ -116,6 +116,10 @@ locals {
     "arn:aws:ssm:${local.region}:${local.account_id}:parameter/orion/*",
   ]
 
+  ssm_put_parameter_arns = [
+    "arn:aws:ssm:${local.region}:${local.account_id}:parameter/orion/smoke-test/*",
+  ]
+
   cw_log_group_arns = [
     "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/orion/*",
     "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/orion/*:*",
@@ -468,6 +472,16 @@ data "aws_iam_policy_document" "orion_sam_deploy_inline" {
       "ssm:GetParametersByPath",
     ]
     resources = local.ssm_parameter_arns
+  }
+
+  statement {
+    sid    = "SSMWriteParameters"
+    effect = "Allow"
+    actions = [
+      "ssm:PutParameter",
+      "ssm:DeleteParameter",
+    ]
+    resources = local.ssm_put_parameter_arns
   }
 
   statement {
