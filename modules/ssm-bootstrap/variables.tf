@@ -71,6 +71,12 @@ variable "lambda_role_arn" {
   default     = ""
 }
 
+variable "apigateway_authorizer_invoke_role_arn" {
+  description = "ARN del IAM role que API Gateway ASSUME para invocar el Lambda authorizer (modules/iam-apigateway-authorizer-invoke.role_arn). Se publica como /orion/iam/apigateway-authorizer-invoke-role-arn. orion-backend lo consume como parametro ApigatewayAuthorizerInvokeRoleArn del template.yaml."
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Tags adicionales aplicados a todos los recursos del modulo."
   type        = map(string)
