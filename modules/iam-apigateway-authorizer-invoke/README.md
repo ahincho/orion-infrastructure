@@ -12,7 +12,7 @@ API Gateway HTTP API v2 con un Lambda Authorizer de tipo `REQUEST` necesita
    trust `lambda.amazonaws.com`. Es el role que la Lambda function usa para
    arrancar (logs, VPC ENI, X-Ray, secrets). No es relevante para la
    invocacion desde API Gateway.
-2. **Invoke role del authorizer** (este modulo, `orion-<env>-apigateway-authorizer-invoke-*`):
+2. **Invoke role del authorizer** (este modulo, `orion-<env>-authorizer-invoke-*`):
    trust `apigateway.amazonaws.com`. Es el role que API Gateway ASSUME para
    hacer `lambda:InvokeFunction` sobre el authorizer Lambda.
 
@@ -23,9 +23,11 @@ referenciar su ARN via `AuthorizerCredentialsArn` en el `AWS::ApiGatewayV2::Auth
 
 ## Que hace
 
-- **`aws_iam_role`** `<project>-<env>-apigateway-authorizer-invoke-<random>` con
+- **`aws_iam_role`** `<project>-<env>-authorizer-invoke-<random>` con
   trust policy: `apigateway.amazonaws.com` (sin condiciones para dev; prod
-  deberia aniadir `aws:SourceAccount` y `aws:SourceArn`).
+  deberia aniadir `aws:SourceAccount` y `aws:SourceArn`). El prefijo se
+  acorta a `authorizer-invoke` (sin `apigateway-`) porque AWS IAM limita
+  `name_prefix` a 38 chars (64 - 26 del sufijo aleatorio).
 - **1 inline policy**:
   - `lambda:InvokeFunction` sobre `var.authorizer_function_arn` (single-ARN
     scope, no wildcard).
