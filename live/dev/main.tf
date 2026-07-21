@@ -249,6 +249,54 @@ module "ssm_bootstrap" {
 }
 
 ###############################################################################
+# Phase 2: Angular SPA hosting (orion-frontend)
+# -----------------------------------------------------------------------------
+# Hosting del SPA Angular (orion-frontend) sobre S3 + CloudFront con OAC.
+# Wire:
+#   - module.cloudfront_spa_hosting       S3 privado + CloudFront + OAC + SPA fallback
+#   - module.iam_angular_spa_deploy_dev   IAM role OIDC para el CD del SPA
+#
+# Outputs consumidos por orion-frontend via GH Secrets/Variables:
+#   - cloudfront_spa_hosting.bucket_id         -> GH Variable S3_BUCKET
+#   - cloudfront_spa_hosting.distribution_id   -> GH Variable CLOUDFRONT_DISTRIBUTION_ID
+#   - iam_angular_spa_deploy_dev.role_arn      -> GH Env secret AWS_DEPLOY_ROLE_ARN (env=dev)
+###############################################################################
+
+module "cloudfront_spa_hosting" {
+  source = "../../modules/cloudfront-spa-hosting"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  # bucket_name vacio = default '<project_name>-frontend-<environment>'
+  # = 'orion-frontend-dev'.
+
+  price_class = "PriceClass_100" # dev: US/CA/EU only (mas barato).
+
+  tags = local.common_tags
+}
+
+module "iam_angular_spa_deploy_dev" {
+  source = "../../modules/iam-angular-spa-deploy-dev"
+
+  project_name      = var.project_name
+  environment       = var.environment
+  aws_region        = var.aws_region
+  oidc_provider_arn = module.oidc_github.oidc_provider_arn
+
+  # El repo consumidor de este role. Distinto al repo de infra que provisiona
+  # (orion-infrastructure). Por eso se hardcodea aca y no se reutiliza
+  # var.github_repository (que apunta al repo de infra).
+  github_repository = "ahincho/orion-frontend"
+
+  # ARN patterns derivados del output del modulo cloudfront_spa_hosting.
+  bucket_name                = module.cloudfront_spa_hosting.bucket_id
+  cloudfront_distribution_id = module.cloudfront_spa_hosting.distribution_id
+
+  tags = local.common_tags
+}
+
+###############################################################################
 # Phase 1.6: OrionAgentCore infra (Bedrock AgentCore Runtime deployment)
 # -----------------------------------------------------------------------------
 # - module.ecr_orion_agent_core: ECR repository privado para imagenes del agent.
