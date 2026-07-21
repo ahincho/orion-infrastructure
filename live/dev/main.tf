@@ -28,18 +28,6 @@
 ###############################################################################
 data "aws_caller_identity" "current" {}
 
-# HTTP API Gateway ID (orion-backend SAM stack). orion-backend `CD - Deploy`
-# escribe este valor a SSM post-deploy desde CFN stack outputs (`HttpApiId`
-# Output en template.yaml). Usado para construir el aws:SourceArn trust
-# condition del role assumido por API Gateway para invocar el authorizer
-# Lambda (modules/iam-apigateway-authorizer-invoke).
-# Si el param no existe, terraform plan falla loud; pre-poblar manualmente
-# con `aws ssm put-parameter --name /orion/apigateway/api-id --value <id> --type String`
-# antes del primer apply (o esperar al primer deploy de orion-backend).
-data "aws_ssm_parameter" "api_gateway_api_id" {
-  name = "/orion/apigateway/api-id"
-}
-
 locals {
   account_id = data.aws_caller_identity.current.account_id
 
@@ -184,16 +172,15 @@ module "iam_apigateway_authorizer_invoke" {
   # la cuenta/region) para que el modulo funcione en otras cuentas AWS.
   authorizer_function_arn = "arn:aws:lambda:${var.aws_region}:${local.account_id}:function:orion-authorizer-${var.environment}"
 
-  # aws:SourceArn = ARN del API Gateway que puede assumir este role (endurece
-  # el trust contra confusion attacks cross-account). Se lee de SSM donde
-  # orion-backend `CD - Deploy` lo escribe post-deploy desde CFN stack outputs
-  # (`HttpApiId` en template.yaml). Si el param SSM no existe (e.g. primer
-  # apply antes del primer deploy de orion-backend), terraform plan FALLA
-  # loudly: pre-poblar manualmente con
-  # `aws ssm put-parameter --name /orion/apigateway/api-id --value <id> --type String`.
-  # El ARN sigue el formato que API Gateway espera en SourceArn:
-  # arn:aws:execute-api:<region>:<account>:<api-id>/*
-  api_gateway_source_arn = "arn:aws:execute-api:${var.aws_region}:${local.account_id}:${data.aws_ssm_parameter.api_gateway_api_id.value}/*"
+  # api_gateway_source_arn intencionalmente NO se setea. AWS API Gateway NO
+  # setea aws:SourceArn (ni aws:SourceAccount) cuando hace sts:AssumeRole
+  # para invocar un Lambda authorizer, asi que cualquier condicion de ese
+  # tipo bloquea el assume role silenciosamente y devuelve 500 en todas
+  # las rutas protegidas. Regresion observada y revertida en PR #75/#76
+  # (despues de la misma regresion previa en PR #73/#74). La variable se
+  # mantiene en el modulo por si AWS anade soporte en el futuro o si se
+  # quiere usar para otro caso de uso (e.g. restringir assume role desde
+  # otros servicios).
 
   tags = local.common_tags
 }
