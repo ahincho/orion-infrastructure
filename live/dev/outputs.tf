@@ -179,6 +179,26 @@ output "orion_sam_deploy_role_name" {
 }
 
 ###############################################################################
+# Phase 1.6b outputs: API Gateway authorizer invoke role
+# -----------------------------------------------------------------------------
+# ARN del rol IAM que API Gateway ASSUME para invocar el Lambda authorizer
+# (REQUEST type). Wire a SSM parameter /orion/iam/apigateway-authorizer-
+# invoke-role-arn para que el workflow `CD - Deploy` de orion-backend lo
+# pase como parametro `ApigatewayAuthorizerInvokeRoleArn` al `sam deploy`
+# (template.yaml) sin hardcodear el ARN en el template.
+# Reemplaza al rol legacy `apigateway-authorizer-invoke-role-dev`.
+###############################################################################
+output "apigateway_authorizer_invoke_role_arn" {
+  description = "ARN del IAM role orion-<env>-apigateway-authorizer-invoke-* (asumido por API Gateway para invocar el Lambda authorizer). Wire a SSM parameter /orion/iam/apigateway-authorizer-invoke-role-arn para que el CD - Deploy de orion-backend lo pase como parametro ApigatewayAuthorizerInvokeRoleArn."
+  value       = module.iam_apigateway_authorizer_invoke.role_arn
+}
+
+output "apigateway_authorizer_invoke_role_name" {
+  description = "Nombre (sin ARN) del IAM role orion-<env>-apigateway-authorizer-invoke-*."
+  value       = module.iam_apigateway_authorizer_invoke.role_name
+}
+
+###############################################################################
 # Phase 1 outputs: SSM parameter paths (que orion-backend resuelve via {{resolve:ssm:...}})
 ###############################################################################
 output "ssm_jwt_secret_arn_param" {

@@ -9,6 +9,10 @@ Crea los SSM Parameters cross-ORION que `orion-backend` consume via
 - `/orion/db/secret-arn` — ARN del RDS master secret (de `modules/rds-postgres/` via `manage_master_user_password`).
 - `/orion/eventbridge/bus-arn` — ARN del bus EventBridge (de `modules/eventbridge-bus/`).
 - `/orion/cors/allowed-origins` — JSON list de origins CORS (default `["http://localhost:3000"]`).
+- `/orion/lambda/vpc-subnet-ids` — Subnet IDs privadas para `VpcConfig` (CSV, de `modules/network/`).
+- `/orion/lambda/security-group-id` — SG ID dedicado para las Lambdas (de `modules/iam-lambda-exec/`).
+- `/orion/lambda/role-arn` — ARN del execution role centralizado (opcional; nested stacks usan roles per-context).
+- `/orion/iam/apigateway-authorizer-invoke-role-arn` — ARN del role que API Gateway ASSUME para invocar el Lambda authorizer (de `modules/iam-apigateway-authorizer-invoke/`).
 
 ## Uso
 
@@ -50,6 +54,10 @@ module "ssm_bootstrap" {
 | `db_secret_arn` | `""` | ARN del RDS master secret. Vacio = no crear. |
 | `eventbridge_bus_arn` | `""` | ARN del bus. Vacio = no crear. |
 | `cors_allowed_origins` | `["http://localhost:3000"]` | Lista de origins. |
+| `lambda_subnet_ids` | `[]` | Subnet IDs privadas para `VpcConfig`. |
+| `lambda_security_group_id` | `""` | SG ID de las Lambdas. Vacio = no crear. |
+| `lambda_role_arn` | `""` | Lambda execution role ARN. Vacio = no crear. |
+| `apigateway_authorizer_invoke_role_arn` | `""` | Authorizer invoke role ARN. Vacio = no crear. |
 | `tags` | `{}` | Tags extra. |
 
 ## Outputs
@@ -61,6 +69,10 @@ module "ssm_bootstrap" {
 | `eventbridge_bus_arn_ssm_param_name` | string | Path del param, o null. |
 | `cors_allowed_origins_ssm_param_name` | string | Path del param (siempre creado). |
 | `cors_allowed_origins_value` | string | JSON-encoded value. |
+| `lambda_vpc_subnet_ids_param_name`, `lambda_vpc_subnet_ids_value` | string | Path/valor del param VPC subnets. |
+| `lambda_security_group_id_param_name`, `lambda_security_group_id_value` | string | Path/valor del param Lambda SG. |
+| `lambda_role_arn_param_name` | string | Path del param Lambda role ARN. |
+| `apigateway_authorizer_invoke_role_arn_param_name`, `apigateway_authorizer_invoke_role_arn_value` | string | Path/valor del param authorizer invoke role. |
 | `created_parameter_names` | list | Paths efectivamente creados. |
 
 ## Decisiones de diseno

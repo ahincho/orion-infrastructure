@@ -144,6 +144,40 @@ module "iam_lambda_exec" {
 }
 
 ###############################################################################
+# Phase 1.6b: API Gateway authorizer invoke role
+# -----------------------------------------------------------------------------
+# Crea el IAM role que API Gateway ASSUME para invocar el Lambda authorizer
+# (REQUEST type) de orion-backend. Sin este role dedicado, API Gateway
+# devuelve 500 en todas las rutas protegidas.
+#
+# El ARN se expone como output `apigateway_authorizer_invoke_role_arn` y
+# reemplaza al rol legacy `apigateway-authorizer-invoke-role-dev` (creado a
+# mano en el bootstrap inicial, nombre no-conformante con la convencion
+# orion-*).
+#
+# Plan de migracion del rol legacy (post-merge):
+#   1. terraform apply crea orion-<env>-apigateway-authorizer-invoke-<hash>
+#      (nuevo) SIN eliminar el legacy.
+#   2. Actualizar el parametro `ApigatewayAuthorizerInvokeRoleArn` del
+#      `template.yaml` de orion-backend al nuevo ARN (via PR o parameter
+#      override en deploy.yml con `data.aws_ssm_parameter`).
+#   3. Push vacio para validar CD - Deploy con el nuevo rol.
+#   4. Si pasa: `aws iam delete-role --role-name apigateway-authorizer-invoke-role-dev`.
+###############################################################################
+module "iam_apigateway_authorizer_invoke" {
+  source = "../../modules/iam-apigateway-authorizer-invoke"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  # El authorizer function ARN se construye con data sources (no se hardcodea
+  # la cuenta/region) para que el modulo funcione en otras cuentas AWS.
+  authorizer_function_arn = "arn:aws:lambda:${var.aws_region}:${local.account_id}:function:orion-authorizer-${var.environment}"
+
+  tags = local.common_tags
+}
+
+###############################################################################
 # Phase 1.7: SAM deploy role (orion-sam-deploy-dev)
 # -----------------------------------------------------------------------------
 # Reemplaza al rol legacy `spark-match-sam-deploy-dev` (parcheado a mano
@@ -169,6 +203,13 @@ module "iam_sam_deploy_dev" {
   aws_region        = var.aws_region
   oidc_provider_arn = module.oidc_github.oidc_provider_arn
   github_repository = "ahincho/orion-backend"
+
+  # Roles que sam deploy puede pasar a CloudFormation (iam:PassRole). Incluye
+  # el rol que API Gateway assume para invocar el authorizer (PR nuevo
+  # feat/iam-apigateway-authorizer-invoke-module).
+  additional_iam_role_arns = [
+    module.iam_apigateway_authorizer_invoke.role_arn,
+  ]
 
   tags = local.common_tags
 }
@@ -244,6 +285,10 @@ module "ssm_bootstrap" {
   lambda_subnet_ids        = module.network.private_subnet_ids
   lambda_security_group_id = module.iam_lambda_exec.lambda_security_group_id
   lambda_role_arn          = module.iam_lambda_exec.role_arn
+
+  # API Gateway authorizer invoke role — orion-backend CD - Deploy lo consume
+  # como parametro `ApigatewayAuthorizerInvokeRoleArn` del template.yaml.
+  apigateway_authorizer_invoke_role_arn = module.iam_apigateway_authorizer_invoke.role_arn
 
   tags = local.common_tags
 }

@@ -85,20 +85,14 @@ locals {
     "arn:aws:events:${local.region}:${local.account_id}:archive/orion-*",
   ]
 
-  iam_role_arns = [
-    "arn:aws:iam::${local.account_id}:role/orion-backend-dev*",
-    "arn:aws:iam::${local.account_id}:role/orion-*-exec-dev",
-    "arn:aws:iam::${local.account_id}:role/orion-lambda-runtime-dev*",
-    # Authorizer invoke role: API Gateway ASSUMES this role to invoke the
-    # Lambda authorizer. sam deploy issues iam:PassRole for any role
-    # referenced in AWS::ApiGatewayV2::Authorizer.AuthorizerCredentialsArn.
-    # The role does not match the orion-* / *-exec-dev / *-runtime-dev*
-    # patterns above because it was created manually before this module
-    # was aware of it; a follow-up orion-infrastructure PR will provision
-    # it via Terraform with a conformant name (orion-apigateway-authorizer-
-    # invoke-dev) and the entry below can be removed.
-    "arn:aws:iam::${local.account_id}:role/apigateway-authorizer-invoke-role-dev",
-  ]
+  iam_role_arns = concat(
+    [
+      "arn:aws:iam::${local.account_id}:role/orion-backend-dev*",
+      "arn:aws:iam::${local.account_id}:role/orion-*-exec-dev",
+      "arn:aws:iam::${local.account_id}:role/orion-lambda-runtime-dev*",
+    ],
+    var.additional_iam_role_arns,
+  )
 
   s3_artifacts_arns = [
     "arn:aws:s3:::orion-sam-artifacts-dev",
