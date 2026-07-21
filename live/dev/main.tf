@@ -357,10 +357,14 @@ resource "terraform_data" "harden_runtime_trust_policy" {
   input = local.runtime_arn_for_trust_policy
 
   provisioner "local-exec" {
-    command = <<-EOT
+    # Force bash explicitly (the default on Windows is cmd.exe, which
+    # does not support `set -euo pipefail`). On Linux runners (CI/CD)
+    # and macOS dev environments, bash is at /bin/bash + PATH.
+    interpreter = ["bash", "-c"]
+    command     = <<-EOT
       set -euo pipefail
-      cat > /tmp/orion-agent-core-runtime-trust-policy.json <<JSON
-      {
+      tmp="$(mktemp -t orion-trust.XXXXXX.json)"
+      printf '%s' '{
         "Version": "2012-10-17",
         "Statement": [{
           "Sid": "BedrockAgentCoreServiceAssume",
@@ -369,15 +373,15 @@ resource "terraform_data" "harden_runtime_trust_policy" {
           "Action": "sts:AssumeRole",
           "Condition": {
             "StringEquals": {
-              "aws:SourceArn": ${jsonencode(local.runtime_arn_for_trust_policy)}
+              "aws:SourceArn": "${jsonencode(local.runtime_arn_for_trust_policy)}"
             }
           }
         }]
-      }
-      JSON
+      }' > "$$tmp"
       aws iam update-assume-role-policy \
         --role-name orion-agent-core-runtime-dev \
-        --policy-document file:///tmp/orion-agent-core-runtime-trust-policy.json
+        --policy-document "file://$$tmp"
+      rm -f "$$tmp"
     EOT
   }
 }
