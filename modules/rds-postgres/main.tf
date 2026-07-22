@@ -6,7 +6,7 @@
 #
 # Decisiones de diseno (Ajuste por free-tier vs Aurora Serverless v2):
 #   - Free tier NO cubre Aurora. Usamos aws_db_instance (RDS Postgres standard).
-#   - Engine: postgres 16.4 default (free, estable, SQL standard).
+#   - Engine: postgres 17.10 default (free, estable, SQL standard).
 #   - Instance class: db.t4g.micro default (free-tier eligible, ARM Graviton).
 #   - Allocated storage: 20 GB max free-tier.
 #   - Multi-AZ: false (free-tier single AZ). Para prod se cambia a true.
@@ -83,14 +83,14 @@ resource "aws_security_group" "db" {
 ###############################################################################
 # DB Parameter Group
 # -----------------------------------------------------------------------------
-# Parametros razonables para Postgres 16:
+# Parametros razonables para Postgres 17:
 #   - log_statement = "all"         (auditar queries; cuesta poco).
 #   - log_min_duration_statement = 1000  (queries >1s al log).
 #   - shared_buffers = 16384       (16MB; razonable para t4g.micro 1GB RAM).
 #   - max_connections = 100        (suficiente para Serverless/Lambdas).
 #   - work_mem = 4MB               (bajo consumo de memoria).
 #
-# Importante: en RDS Postgres 16, los parametros STATIC (shared_buffers,
+# Importante: en RDS Postgres 17, los parametros STATIC (shared_buffers,
 # max_connections, work_mem, timezone, rds.force_ssl) NO se pueden aplicar
 # con `apply_method = "immediate"`. Requieren `pending-reboot` (= se aplican
 # despues del proximo reinicio de la DB). AWS API rechaza con:
@@ -102,7 +102,7 @@ resource "aws_security_group" "db" {
 ###############################################################################
 resource "aws_db_parameter_group" "main" {
   name_prefix = "${var.project_name}-${var.environment}-rds-pg-"
-  family      = "postgres16"
+  family      = "postgres17"
 
   # Dynamic params (apply_method default = "immediate").
   parameter {
@@ -181,6 +181,12 @@ resource "aws_db_instance" "main" {
   engine         = "postgres"
   engine_version = var.engine_version
   instance_class = var.instance_class
+
+  # Major version upgrades (e.g. 16.4 -> 17.10) are non-trivial: AWS performs
+  # an in-place pg_upgrade on next reboot. Default `false` to prevent
+  # accidental cross-major bumps; toggle true for planned upgrades. Minor
+  # version upgrades stay controlled by `auto_minor_version_upgrade`.
+  allow_major_version_upgrade = var.allow_major_version_upgrade
 
   allocated_storage     = var.allocated_storage
   max_allocated_storage = var.max_allocated_storage > 0 ? var.max_allocated_storage : null
