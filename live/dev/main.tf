@@ -259,6 +259,11 @@ module "rds_postgres" {
   backup_retention_period    = 1
   auto_minor_version_upgrade = true
 
+  # Major version bump 16.4 -> 17.10 (Sprint C). Module default is false;
+  # toggled true here for this one PR. Reverted to false in the follow-up
+  # once the upgrade is confirmed in AWS (engine_version_actual = 17.10).
+  allow_major_version_upgrade = true
+
   tags = local.common_tags
 
   depends_on = [module.iam_lambda_exec]
