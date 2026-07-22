@@ -102,7 +102,7 @@ resource "aws_security_group" "db" {
 ###############################################################################
 resource "aws_db_parameter_group" "main" {
   name_prefix = "${var.project_name}-${var.environment}-rds-pg-"
-  family      = "postgres16"
+  family      = "postgres17"
 
   # Dynamic params (apply_method default = "immediate").
   parameter {
