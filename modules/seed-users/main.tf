@@ -57,15 +57,6 @@ locals {
     }
   )
 
-  lambda_function_arns = [
-    "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:orion-bootstrap-supervisor-${var.environment}",
-    "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:orion-bootstrap-supervisor-${var.environment}:*",
-    "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:orion-seed-users-${var.environment}",
-    "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:orion-seed-users-${var.environment}:*",
-    "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:orion-seed-${var.environment}-*",
-    "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:orion-seed-${var.environment}-*:*",
-  ]
-
   cw_log_group_arns = [
     "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/orion-bootstrap-supervisor-${var.environment}",
     "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/orion-bootstrap-supervisor-${var.environment}:*",
