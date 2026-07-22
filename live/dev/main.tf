@@ -312,6 +312,46 @@ module "ssm_bootstrap" {
 }
 
 ###############################################################################
+# Stage 4: Seed-users infra (Secrets Manager + SSM + IAM Lambda exec role)
+# -----------------------------------------------------------------------------
+# Aprovisiona los recursos que las Lambdas bootstrap-supervisor + seed-users
+# (Stage 6 en orion-backend) consumiran para sembrar usuarios iniciales:
+#   1. Secrets Manager secret: shared dev password SecureString.
+#   2. SSM Parameter: /orion/seed/email-domain (default 'orion.dev').
+#   3. IAM Lambda execution role: orion-seed-users-lambda-exec-dev.
+#
+# Wiring en Stage 6 (orion-backend):
+#   - module.seed_users.shared_dev_password_secret_arn -> Lambda env var
+#     SHARED_DEV_PASSWORD_SECRET_ARN (resolve via SM SDK).
+#   - module.seed_users.email_domain_ssm_param_name -> SAM param
+#     SeedEmailDomainSsmParam (template.yaml: {{resolve:ssm:...}}).
+#   - module.seed_users.lambda_exec_role_arn -> SAM Function.Role.
+#
+# Outputs expostos en live/dev/outputs.tf para wiring posterior via
+# `terraform output -json` + gh secret set.
+###############################################################################
+module "seed_users" {
+  source = "../../modules/seed-users"
+
+  project_name = var.project_name
+  environment  = var.environment
+  aws_region   = var.aws_region
+
+  # RDS app connection secret (modules/rds-postgres): el Lambda execution
+  # role necesita GetSecretValue sobre este ARN para conectar al DB.
+  rds_app_connection_secret_arn = module.rds_postgres.app_connection_secret_arn
+
+  # Defaults explicitos para dev. Para staging/prod ajustar via tfvars.
+  email_domain            = "orion.dev"
+  shared_password_length  = 32
+  recovery_window_in_days = 0 # dev: delete OK sin espera
+
+  tags = local.common_tags
+
+  depends_on = [module.rds_postgres]
+}
+
+###############################################################################
 # Phase 2: Angular SPA hosting (orion-frontend)
 # -----------------------------------------------------------------------------
 # Hosting del SPA Angular (orion-frontend) sobre S3 + CloudFront con OAC.

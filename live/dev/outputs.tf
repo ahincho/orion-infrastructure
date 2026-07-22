@@ -349,3 +349,47 @@ output "spa_deploy_role_name" {
   description = "Nombre (sin ARN) del IAM role de deploy del SPA."
   value       = module.iam_angular_spa_deploy_dev.role_name
 }
+
+###############################################################################
+# Stage 4 outputs: Seed-users infra
+# -----------------------------------------------------------------------------
+# Consumidos por orion-backend (Stage 6) para wirear las Lambdas
+# bootstrap-supervisor + seed-users:
+#   - seed_users_shared_dev_password_secret_arn -> Lambda env var
+#     SHARED_DEV_PASSWORD_SECRET_ARN (resolve via Secrets Manager SDK).
+#   - seed_users_email_domain_ssm_param_name -> SAM parameter
+#     SeedEmailDomainSsmParam ({{resolve:ssm:/orion/seed/email-domain}}).
+#   - seed_users_email_domain_value -> valor por defecto `orion.dev` para
+#     verificacion post-apply.
+#   - seed_users_lambda_exec_role_arn -> SAM Function.Role.
+###############################################################################
+output "seed_users_shared_dev_password_secret_arn" {
+  description = "ARN del Secrets Manager secret con el shared dev password. Wire a GitHub Environment secret SHARED_DEV_PASSWORD_SECRET_ARN (orion-backend / env: dev) o pass directamente via SAM parameter."
+  value       = module.seed_users.shared_dev_password_secret_arn
+}
+
+output "seed_users_shared_dev_password_secret_name" {
+  description = "Nombre (sin ARN) del secret de shared dev password."
+  value       = module.seed_users.shared_dev_password_secret_name
+}
+
+output "seed_users_email_domain_ssm_param_name" {
+  description = "Path del SSM param /orion/seed/email-domain. Wire como SAM parameter SeedEmailDomainSsmParam (template.yaml: {{resolve:ssm:/orion/seed/email-domain}})."
+  value       = module.seed_users.email_domain_ssm_param_name
+}
+
+output "seed_users_email_domain_value" {
+  description = "Valor actual del email domain (default 'orion.dev'). Marcado como sensitive porque proviene de un SSM SecureString (Terraform propaga la sensitivity del upstream). Para verificacion post-apply usar `terraform output -json seed_users_email_domain_ssm_param_name` y `aws ssm get-parameter --with-decryption`."
+  value       = module.seed_users.email_domain_value
+  sensitive   = true
+}
+
+output "seed_users_lambda_exec_role_arn" {
+  description = "ARN del IAM Lambda execution role orion-seed-users-lambda-exec-dev. Wire como SAM Function.Role para las Lambdas bootstrap-supervisor + seed-users (Stage 6)."
+  value       = module.seed_users.lambda_exec_role_arn
+}
+
+output "seed_users_lambda_exec_role_name" {
+  description = "Nombre (sin ARN) del IAM Lambda execution role."
+  value       = module.seed_users.lambda_exec_role_name
+}
