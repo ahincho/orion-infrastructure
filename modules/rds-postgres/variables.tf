@@ -19,9 +19,9 @@ variable "environment" {
 }
 
 variable "engine_version" {
-  description = "Postgres engine version. Default = 16.4 (ultimo estable en region us-east-1)."
+  description = "Postgres engine version. Default = 17.10 (ultimo estable en region us-east-1; major bump desde 16.4 hecho en Sprint C)."
   type        = string
-  default     = "16.4"
+  default     = "17.10"
 }
 
 variable "instance_class" {
@@ -164,6 +164,12 @@ variable "auto_minor_version_upgrade" {
   description = "Si true, AWS actualiza automaticamente a minor versions mas nuevas."
   type        = bool
   default     = true
+}
+
+variable "allow_major_version_upgrade" {
+  description = "Permitir major version upgrades in-place (e.g. 16.x -> 17.x via pg_upgrade en reboot). Default false para evitar bumps accidentales; toggle true en bumps planeados."
+  type        = bool
+  default     = false
 }
 
 variable "deletion_protection" {

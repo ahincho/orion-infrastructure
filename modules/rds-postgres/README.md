@@ -1,18 +1,18 @@
 # Module: `orion-infrastructure::rds-postgres`
 
-Crea una instancia RDS Postgres para ORION. Configuracion default compatible con **AWS Free Tier** (`db.t4g.micro`, 20 GB, single-AZ, Postgres 16).
+Crea una instancia RDS Postgres para ORION. Configuracion default compatible con **AWS Free Tier** (`db.t4g.micro`, 20 GB, single-AZ, Postgres 17).
 
 ## Que hace
 
 - **`aws_db_subnet_group`** con las subnet privadas del VPC (típicamente `modules/network.private_subnet_ids`).
 - **`aws_security_group`** con ingress TCP/5432 desde los SGs allowlist (típicamente el SG de las Lambdas).
-- **`aws_db_parameter_group`** (Postgres 16 family) con tuning: `log_statement=all`, `log_min_duration_statement=1000`, `shared_buffers=16MB`, `max_connections=100`, `work_mem=4MB`, `timezone=UTC`.
+- **`aws_db_parameter_group`** (Postgres 17 family) con tuning: `log_statement=all`, `log_min_duration_statement=1000`, `shared_buffers=16MB`, `max_connections=100`, `work_mem=4MB`, `timezone=UTC`.
 - **`aws_db_instance`** con `manage_master_user_password=true` (RDS manages password via Secrets Manager; rotation enableable).
 
 ## Decisiones de diseno (vs Aurora Serverless v2)
 
 - **Free tier no cubre Aurora**. Usamos RDS Postgres standard (`aws_db_instance`).
-- **Engine 16.4** default (latest estable en us-east-1; soporta muchas features modernas, RDS 16 LTS).
+- **Engine 17.10** default (latest estable en us-east-1; soporta muchas features modernas, RDS 17).
 - **`db.t4g.micro`** default (ARM Graviton; free-tier eligible; mejor perf/watt que db.t3.micro).
 - **20 GB gp3** = max free-tier storage. `storage_encrypted=true` (sin coste extra para gp3).
 - **Multi-AZ OFF** por free-tier; `availability_zone=us-east-1a` explicito.
@@ -28,7 +28,7 @@ module "rds" {
   project_name = "orion"
   environment  = "dev"
 
-  engine_version  = "16.4"
+  engine_version  = "17.10"
   instance_class  = "db.t4g.micro"  # free-tier
   allocated_storage = 20
 
@@ -75,7 +75,7 @@ module "rds_prod" {
 |---|---|---|
 | `project_name` | requerido | kebab-case (3-30). |
 | `environment` | requerido | `dev` \| `staging` \| `prod`. |
-| `engine_version` | `16.4` | Postgres version. |
+| `engine_version` | `17.10` | Postgres version. |
 | `instance_class` | `db.t4g.micro` | Free-tier eligible: `db.t3.micro`, `db.t4g.micro`, `db.t3.small`, `db.t4g.small`. |
 | `allocated_storage` | `20` | Storage inicial GB (max free-tier). |
 | `max_allocated_storage` | `100` | Autoscaling cap. 0 desactiva. |
@@ -95,6 +95,7 @@ module "rds_prod" {
 | `preferred_backup_window` | `03:00-04:00` | UTC. |
 | `preferred_maintenance_window` | `Sun:04:00-Sun:05:00` | UTC. |
 | `auto_minor_version_upgrade` | `true` | Auto minor upgrades. |
+| `allow_major_version_upgrade` | `false` | Permitir major version upgrades in-place (16.x -> 17.x). Default false; toggle true para bumps planeados. |
 | `deletion_protection` | `false` | Bloquea delete. dev=false. |
 | `performance_insights_enabled` | `false` | dev=false (free up to 7d); prod=true. |
 | `performance_insights_retention` | `7` | 7 (free) o 731 (long-term). |

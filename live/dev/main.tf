@@ -234,7 +234,7 @@ module "rds_postgres" {
   project_name = var.project_name
   environment  = var.environment
 
-  engine_version    = "16.4"
+  engine_version    = "17.10"
   instance_class    = "db.t4g.micro" # free-tier eligible, ARM Graviton
   allocated_storage = 20             # free-tier max
   storage_type      = "gp3"
