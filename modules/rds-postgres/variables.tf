@@ -172,6 +172,12 @@ variable "allow_major_version_upgrade" {
   default     = false
 }
 
+variable "apply_immediately" {
+  description = "Si true, RDS aplica cambios inmediatamente (no espera al maintenance window). Default false; toggle true en dev upgrades donde esperar hasta Sun 04:00 UTC es inaceptable."
+  type        = bool
+  default     = false
+}
+
 variable "deletion_protection" {
   description = "Si true, RDS bloquea el delete del instance. Para dev=false (allow teardown). Prod=true."
   type        = bool

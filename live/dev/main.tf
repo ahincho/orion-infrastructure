@@ -264,6 +264,10 @@ module "rds_postgres" {
   # once the upgrade is confirmed in AWS (engine_version_actual = 17.10).
   allow_major_version_upgrade = true
 
+  # Forzar el upgrade inmediatamente (no esperar al Sun 04:00 UTC maintenance
+  # window). Dev only — no es deseable en prod.
+  apply_immediately = true
+
   tags = local.common_tags
 
   depends_on = [module.iam_lambda_exec]

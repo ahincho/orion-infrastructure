@@ -215,6 +215,11 @@ resource "aws_db_instance" "main" {
   # Auto-updates: minor only.
   auto_minor_version_upgrade = var.auto_minor_version_upgrade
 
+  # Apply changes immediately rather than at next maintenance window.
+  # Default false (AWS best practice: minimize disruption); toggle true for
+  # dev upgrades where waiting for Sun 04:00 UTC is not acceptable.
+  apply_immediately = var.apply_immediately
+
   # Soft-delete protection (Terraform-side); instance-level deletion protection
   # requiere feature flip explicita de AWS.
   deletion_protection = var.deletion_protection
