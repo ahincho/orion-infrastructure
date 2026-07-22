@@ -259,14 +259,15 @@ module "rds_postgres" {
   backup_retention_period    = 1
   auto_minor_version_upgrade = true
 
-  # Major version bump 16.4 -> 17.10 (Sprint C). Module default is false;
-  # toggled true here for this one PR. Reverted to false in the follow-up
-  # once the upgrade is confirmed in AWS (engine_version_actual = 17.10).
-  allow_major_version_upgrade = true
-
-  # Forzar el upgrade inmediatamente (no esperar al Sun 04:00 UTC maintenance
-  # window). Dev only — no es deseable en prod.
-  apply_immediately = true
+  # Major version bump 16.4 -> 17.10 (Sprint C) completed. PRs in order:
+  #   #84: engine 16.4 -> 17.10 + family postgres17 (apply errored on order)
+  #   #85: allow_major_version_upgrade=true
+  #   #86: family postgres17 -> postgres16 (engine pending-reboot at 17.10)
+  #   #87: apply_immediately=true (engine=17.10 live)
+  #   #88: family postgres16 -> postgres17 (single pg group, state clean)
+  # Both allow_major_version_upgrade and apply_immediately are reverted to
+  # their module defaults (false). For future planned bumps, set them true
+  # in a new PR and revert afterwards.
 
   tags = local.common_tags
 
