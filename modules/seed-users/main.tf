@@ -142,6 +142,56 @@ resource "aws_ssm_parameter" "email_domain" {
 }
 
 ###############################################################################
+# SSM Parameter: /orion/seed/shared-dev-password-secret-arn
+# -----------------------------------------------------------------------------
+# Publica el ARN del secret de shared dev password a SSM para que workflows
+# en otros repos (orion-backend CD - Deploy) puedan resolverlo via
+# `aws ssm get-parameter --name /orion/seed/shared-dev-password-secret-arn`.
+# Type=String (no SecureString): el ARN NO es un secreto en si mismo (se
+# necesita acceso adicional `secretsmanager:GetSecretValue` para obtener
+# el valor). Esto es consistente con /orion/secret/jwt-arn y
+# /orion/db/secret-arn (ambos String en modules/ssm-bootstrap/).
+###############################################################################
+resource "aws_ssm_parameter" "shared_dev_password_secret_arn_publish" {
+  # checkov:skip=CKV2_AWS_34:ARN es IAM resource identifier (no secreto). String type OK. Mismo patron que /orion/iam/apigateway-authorizer-invoke-role-arn en modules/ssm-bootstrap.
+  name        = "/orion/seed/shared-dev-password-secret-arn"
+  description = "ARN del Secrets Manager secret que contiene el shared dev password (JSON shape: {version, use, password, rotatedAt}). Consumido por orion-backend CD - Deploy (resolve-vpc-config) para wire SHARED_DEV_PASSWORD_SECRET_ARN como --parameter-overrides. Published automatically by Terraform; rotate only if the underlying secret is recreated."
+  type        = "String"
+  value       = aws_secretsmanager_secret.shared_dev_password.arn
+
+  tags = merge(local.common_tags, {
+    Name = "shared-dev-password-secret-arn-publish"
+  })
+
+  lifecycle {
+    # El ARN cambia solo si el secret es recreado (rotation via
+    # `terraform apply -replace`). Reflejar el nuevo valor en SSM.
+    ignore_changes = []
+  }
+}
+
+###############################################################################
+# SSM Parameter: /orion/iam/seed-users-lambda-exec-role-arn
+# -----------------------------------------------------------------------------
+# Publica el ARN del IAM Lambda execution role creado por este modulo para
+# que orion-backend Stage 6 pueda wirearlo como `Role:` en las SAM
+# Functions (bootstrap-supervisor + seed-users). Mismo patron que
+# /orion/iam/apigateway-authorizer-invoke-role-arn (modules/iam-apigateway-
+# authorizer-invoke) que consume `resolve-vpc-config` job en deploy.yml.
+###############################################################################
+resource "aws_ssm_parameter" "lambda_exec_role_arn_publish" {
+  # checkov:skip=CKV2_AWS_34:Role ARN es IAM resource identifier (no secreto). String type OK. Mismo patron que /orion/iam/apigateway-authorizer-invoke-role-arn en modules/ssm-bootstrap.
+  name        = "/orion/iam/seed-users-lambda-exec-role-arn"
+  description = "ARN del IAM Lambda execution role (orion-seed-users-lambda-exec-<env>) que consumen las Lambdas bootstrap-supervisor + seed-users en orion-backend. Consumido por CD - Deploy (resolve-vpc-config) para wire SeedUsersLambdaExecRoleArn como --parameter-overrides. Published automatically by Terraform; rotate only if the role is recreated."
+  type        = "String"
+  value       = aws_iam_role.seed_users_lambda_exec.arn
+
+  tags = merge(local.common_tags, {
+    Name = "seed-users-lambda-exec-role-arn-publish"
+  })
+}
+
+###############################################################################
 # IAM Lambda execution role: orion-seed-users-lambda-exec-<env>
 # -----------------------------------------------------------------------------
 # Trust policy: lambda.amazonaws.com (cualquier Lambda de la cuenta puede
