@@ -290,6 +290,27 @@ data "aws_iam_policy_document" "seed_users_lambda_exec_inline" {
   }
 
   ###########################################################################
+  # SSM: /orion/db/secret-arn (resuelve el ARN del RDS secret consumido por
+  # `getDbConnection()` del kysely pool compartido). El modulo
+  # `ssm-bootstrap` lo publica como String; las Lambdas seed-users lo leen
+  # para armar el `pg.Pool` antes de conectar. Sin este grant, la inicializacion
+  # del pool falla con AccessDeniedException y la Lambda retorna el
+  # generic `SSM is unavailable` (causa raiz oculta — ver bootstrap-supervisor
+  # debug log orion-backend #127).
+  ###########################################################################
+  statement {
+    sid    = "SSMReadDBConnectionSecretArn"
+    effect = "Allow"
+    actions = [
+      "ssm:GetParameter",
+      "ssm:GetParameters",
+    ]
+    resources = [
+      "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/orion/db/secret-arn",
+    ]
+  }
+
+  ###########################################################################
   # EC2 ENI management para VPC attachment
   # -----------------------------------------------------------------------------
   # Lambda service requiere estos permisos para crear/manage ENIs en las
