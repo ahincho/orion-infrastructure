@@ -353,11 +353,35 @@ data "aws_iam_policy_document" "seed_users_lambda_exec_inline" {
 
   ###########################################################################
   # KMS Decrypt para resolver SecureStrings de SSM (email-domain + opcional).
-  # Condicion tag Project=orion Environment=<env> para limitar a CMKs
-  # gestionados por este repo (mismo patron que iam-sam-deploy-dev).
+  # Patrón doble:
+  #  1. AWS-managed CMKs (alias/aws/ssm, alias/aws/secretsmanager): NO tienen
+  #     tags `Project=orion` / `Environment=<env>` (son AWS-managed, no
+  #     taggables), así que cualquier `aws:ResourceTag/*` condition falla. Se
+  #     otorga acceso unconditional scope=`alias/aws/*`. Mismo patron que el
+  #     IdentityFunctionRole en orion-backend contexts/identity/template.yaml.
+  #  2. Customer-managed CMKs (futuro modules/kms/): conditional con
+  #     `aws:ResourceTag/Project=orion` + `aws:ResourceTag/Environment=<env>`
+  #     para limited access a CMKs gestionados por este repo.
+  # Sin ambas statements, las Lambdas NO pueden resolver el SSM SecureString
+  # /orion/seed/email-domain (Stage 4 + Stage 6 bug observado en runtime:
+  # `SSM is unavailable` desde bootstrap-supervisor con `key_id = "alias/aws/ssm"`).
   ###########################################################################
   statement {
-    sid    = "KMSDecryptForSSMSecureStrings"
+    sid    = "KMSDecryptForAWSManagedCMKs"
+    effect = "Allow"
+    actions = [
+      "kms:Decrypt",
+      "kms:GenerateDataKey",
+      "kms:DescribeKey",
+    ]
+    resources = [
+      "arn:aws:kms:${var.aws_region}:${data.aws_caller_identity.current.account_id}:alias/aws/ssm",
+      "arn:aws:kms:${var.aws_region}:${data.aws_caller_identity.current.account_id}:alias/aws/secretsmanager",
+    ]
+  }
+
+  statement {
+    sid    = "KMSDecryptForCustomerManagedCMKs"
     effect = "Allow"
     actions = [
       "kms:Decrypt",
