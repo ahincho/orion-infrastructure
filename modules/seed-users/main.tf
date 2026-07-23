@@ -60,8 +60,12 @@ locals {
   cw_log_group_arns = [
     "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/orion-bootstrap-supervisor-${var.environment}",
     "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/orion-bootstrap-supervisor-${var.environment}:*",
+    "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/orion-identity-bootstrap-supervisor-${var.environment}",
+    "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/orion-identity-bootstrap-supervisor-${var.environment}:*",
     "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/orion-seed-users-${var.environment}",
     "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/orion-seed-users-${var.environment}:*",
+    "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/orion-identity-seed-users-${var.environment}",
+    "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/orion-identity-seed-users-${var.environment}:*",
     "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/orion-seed-${var.environment}-*",
     "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/orion-seed-${var.environment}-*:*",
   ]
